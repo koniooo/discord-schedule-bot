@@ -17,6 +17,7 @@ def build_request(path: str, token: str) -> Request:
 
 
 def get_current_user(token: str) -> dict[str, Any]:
+    """GET https://discord.com/api/v10/users/@me"""
     built_request = build_request("/users/@me", token)
     with urlopen(built_request) as response:
         return json.load(response)

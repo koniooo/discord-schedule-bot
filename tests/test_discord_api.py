@@ -4,27 +4,48 @@ from urllib.request import Request
 import pytest
 
 import discord_api
-from discord_api import build_request, get_current_user
+from discord_api import HttpMethod, build_request, get_current_user
+
+
+def test_build_request_raises_when_path_does_not_start_with_slash() -> None:
+    with pytest.raises(ValueError):
+        build_request("GET", "users/@me", "dummy-token")
 
 
 def test_build_request_sets_full_url() -> None:
     assert (
-        build_request("/users/@me", "dummy-token").full_url
+        build_request(
+            "GET",
+            "/users/@me",
+            "dummy-token",
+        ).full_url
         == "https://discord.com/api/v10/users/@me"
     )
 
 
 def test_build_request_sets_bot_authorization_header() -> None:
     assert (
-        build_request("/users/@me", "dummy-token").get_header("Authorization")
+        build_request(
+            "GET",
+            "/users/@me",
+            "dummy-token",
+        ).get_header("Authorization")
         == "Bot dummy-token"
     )
 
 
 def test_build_request_sets_user_agent_header() -> None:
     assert (
-        build_request("/users/@me", "dummy-token").get_header("User-agent")
+        build_request("GET", "/users/@me", "dummy-token").get_header("User-agent")
         == "DiscordBot (https://github.com/koniooo/discord-schedule-bot, 0.1.0)"
+    )
+
+
+@pytest.mark.parametrize("expected_method", ["GET", "POST", "PUT"])
+def test_build_request_uses_given_method(expected_method: HttpMethod) -> None:
+    assert (
+        build_request(expected_method, "/x", "dummy-token").get_method()
+        == expected_method
     )
 
 

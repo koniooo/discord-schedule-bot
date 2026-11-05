@@ -1,4 +1,5 @@
 from io import BytesIO
+from typing import Any
 from urllib.request import Request
 
 import pytest
@@ -28,10 +29,14 @@ def test_build_request_sets_user_agent_header() -> None:
     )
 
 
-@pytest.mark.parametrize("expected_method", ["GET", "POST", "PUT"])
-def test_build_request_uses_given_method(expected_method: HttpMethod) -> None:
+@pytest.mark.parametrize(
+    ("expected_method", "body"), [("GET", None), ("POST", {}), ("PUT", None)]
+)
+def test_build_request_uses_given_method(
+    expected_method: HttpMethod, body: dict[str, Any] | None
+) -> None:
     assert (
-        build_request(expected_method, "/x", "dummy-token").get_method()
+        build_request(expected_method, "/x", "dummy-token", body).get_method()
         == expected_method
     )
 
@@ -50,6 +55,11 @@ def test_build_request_has_no_body_when_body_is_not_given() -> None:
 def test_build_request_rejects_path_without_leading_slash() -> None:
     with pytest.raises(ValueError):
         build_request("GET", "users/@me", "dummy-token")
+
+
+def test_build_request_rejects_post_without_body() -> None:
+    with pytest.raises(ValueError):
+        build_request("POST", "/x", "dummy-token")
 
 
 def test_get_current_user(monkeypatch: pytest.MonkeyPatch) -> None:

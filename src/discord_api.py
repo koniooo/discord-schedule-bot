@@ -14,6 +14,9 @@ def build_request(
     if not path.startswith("/"):
         raise ValueError(f"path must start with '/': {path}")
 
+    if method == "POST" and body is None:
+        raise ValueError("POST requires a body")
+
     return Request(
         method=method,
         url=f"{DISCORD_API_BASE_URL}{path}",

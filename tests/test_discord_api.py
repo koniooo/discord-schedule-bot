@@ -7,7 +7,7 @@ import discord_api
 from discord_api import HttpMethod, build_request, get_current_user
 
 
-def test_build_request_raises_when_path_does_not_start_with_slash() -> None:
+def test_build_request_rejects_path_without_leading_slash() -> None:
     with pytest.raises(ValueError):
         build_request("GET", "users/@me", "dummy-token")
 

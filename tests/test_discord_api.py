@@ -23,13 +23,20 @@ def test_build_request_sets_full_url() -> None:
     )
 
 
+def test_build_request_sets_json_body() -> None:
+    assert (
+        build_request("POST", "/x", "dummy-token", body={"content": "hello"}).data
+        == b'{"content": "hello"}'
+    )
+
+
+def test_build_request_has_no_body_when_body_is_not_given() -> None:
+    assert build_request("GET", "/x", "dummy-token").data is None
+
+
 def test_build_request_sets_bot_authorization_header() -> None:
     assert (
-        build_request(
-            "GET",
-            "/users/@me",
-            "dummy-token",
-        ).get_header("Authorization")
+        build_request("GET", "/users/@me", "dummy-token").get_header("Authorization")
         == "Bot dummy-token"
     )
 

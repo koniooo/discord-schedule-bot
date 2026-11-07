@@ -17,13 +17,18 @@ def build_request(
     if method == "POST" and body is None:
         raise ValueError("POST requires a body")
 
+    headers = {
+        "Authorization": f"Bot {token}",
+        "User-Agent": USER_AGENT,
+    }
+
+    if body is not None:
+        headers["Content-Type"] = "application/json"
+
     return Request(
         method=method,
         url=f"{DISCORD_API_BASE_URL}{path}",
-        headers={
-            "Authorization": f"Bot {token}",
-            "User-Agent": USER_AGENT,
-        },
+        headers=headers,
         data=None if body is None else json.dumps(body).encode(),
     )
 

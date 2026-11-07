@@ -29,6 +29,17 @@ def test_build_request_sets_user_agent_header() -> None:
     )
 
 
+def test_build_request_sets_json_content_type_when_body_is_given() -> None:
+    assert (
+        build_request("POST", "/x", "dummy-token", body={}).get_header("Content-type")
+        == "application/json"
+    )
+
+
+def test_build_request_does_not_set_content_type_without_body() -> None:
+    assert build_request("GET", "/x", "dummy-token").get_header("Content-type") is None
+
+
 @pytest.mark.parametrize(
     ("expected_method", "body"), [("GET", None), ("POST", {}), ("PUT", None)]
 )

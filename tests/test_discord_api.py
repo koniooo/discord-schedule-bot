@@ -5,7 +5,7 @@ from urllib.request import Request
 import pytest
 
 import discord_api
-from discord_api import HttpMethod, build_request, get_current_user
+from discord_api import HttpMethod, build_request, get_current_user, post_message
 
 
 def test_build_request_sets_full_url() -> None:
@@ -80,3 +80,15 @@ def test_get_current_user(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
 
     assert get_current_user("dummy-token") == {"id": "123", "username": "sample-bot"}
+
+
+def test_post_message(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_urlopen(_request: Request) -> BytesIO:
+        return BytesIO(b'{"id": "123", "content": "hello"}')
+
+    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
+
+    assert post_message("dummy-token", "456", {"content": "hello"}) == {
+        "id": "123",
+        "content": "hello",
+    }

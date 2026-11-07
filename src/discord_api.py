@@ -35,6 +35,13 @@ def build_request(
 
 def get_current_user(token: str) -> dict[str, Any]:
     """GET https://discord.com/api/v10/users/@me"""
-    built_request = build_request("GET", "/users/@me", token)
-    with urlopen(built_request) as response:
+    request = build_request("GET", "/users/@me", token)
+    with urlopen(request) as response:
+        return json.load(response)
+
+
+def post_message(token: str, channel_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    """POST https://discord.com/api/v10/channels/{channel_id}/messages"""
+    request = build_request("POST", f"/channels/{channel_id}/messages", token, body)
+    with urlopen(request) as response:
         return json.load(response)

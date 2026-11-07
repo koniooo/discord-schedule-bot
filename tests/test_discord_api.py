@@ -82,7 +82,7 @@ def test_get_current_user(monkeypatch: pytest.MonkeyPatch) -> None:
     assert get_current_user("dummy-token") == {"id": "123", "username": "sample-bot"}
 
 
-def test_post_message(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_post_message_returns_created_message(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_urlopen(_request: Request) -> BytesIO:
         return BytesIO(b'{"id": "123", "content": "hello"}')
 
@@ -92,3 +92,19 @@ def test_post_message(monkeypatch: pytest.MonkeyPatch) -> None:
         "id": "123",
         "content": "hello",
     }
+
+
+def test_post_message_build_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[Request] = []
+
+    def fake_urlopen(request: Request) -> BytesIO:
+        assert request.full_url == "https://discord.com/api/v10/channels/456/messages"
+        assert request.method == "POST"
+        assert request.data == b'{"content": "hello"}'
+        calls.append(request)
+        return BytesIO(b'{"id": "123", "content": "hello"}')
+
+    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
+
+    post_message("dummy-token", "456", body={"content": "hello"})
+    assert len(calls) == 1

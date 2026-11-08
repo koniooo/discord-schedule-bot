@@ -67,12 +67,12 @@ def test_build_request_has_no_body_when_body_is_not_given() -> None:
 
 
 def test_build_request_rejects_path_without_leading_slash() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="users/@me"):
         build_request("GET", "users/@me", "dummy-token")
 
 
 def test_build_request_rejects_post_without_body() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="body"):
         build_request("POST", "/x", "dummy-token")
 
 

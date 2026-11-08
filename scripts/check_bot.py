@@ -2,13 +2,13 @@ from pprint import pprint
 
 from dotenv import load_dotenv
 
-from config import get_bot_token, get_required_env
+from config import get_required_env
 from discord_api import get_current_user, post_message
 
 
 def main() -> None:
     load_dotenv()
-    token = get_bot_token()
+    token = get_required_env("DISCORD_BOT_TOKEN")
     channel_id = get_required_env("DISCORD_CHANNEL_ID")
     current_user = get_current_user(token)
     pprint(current_user)

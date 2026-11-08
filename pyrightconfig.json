@@ -2,5 +2,7 @@
   "include": ["."],
   "exclude": [".venv"],
   "pythonVersion": "3.14",
-  "typeCheckingMode": "strict"
+  "typeCheckingMode": "strict",
+  "venvPath": ".",
+  "venv": ".venv"
 }

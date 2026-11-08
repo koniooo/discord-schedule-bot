@@ -85,6 +85,23 @@ def test_get_current_user_returns_user(monkeypatch: pytest.MonkeyPatch) -> None:
     assert get_current_user("dummy-token") == {"id": "123", "username": "sample-bot"}
 
 
+def test_get_current_user_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[Request] = []
+
+    def fake_urlopen(request: Request) -> BytesIO:
+        calls.append(request)
+        return BytesIO(b'{"id": "123", "username": "sample-bot"}')
+
+    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
+    get_current_user("dummy-token")
+
+    assert len(calls) == 1
+    request = calls[0]
+    assert request.method == "GET"
+    assert request.full_url == "https://discord.com/api/v10/users/@me"
+    assert request.get_header("Authorization") == "Bot dummy-token"
+
+
 def test_post_message_returns_created_message(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_urlopen(_request: Request) -> BytesIO:
         return BytesIO(b'{"id": "123", "content": "hello"}')

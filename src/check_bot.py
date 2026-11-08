@@ -12,8 +12,8 @@ def main() -> None:
     channel_id = get_required_env("DISCORD_CHANNEL_ID")
     current_user = get_current_user(token)
     pprint(current_user)
-    post_response = post_message(token, channel_id, {"content": "Fuck u"})
-    pprint(post_response)
+    posted_message = post_message(token, channel_id, {"content": "hello"})
+    pprint(posted_message)
 
 
 if __name__ == "__main__":

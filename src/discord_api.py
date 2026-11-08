@@ -1,5 +1,6 @@
 import json
 from typing import Any, Literal
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 DISCORD_API_BASE_URL = "https://discord.com/api/v10"
@@ -45,3 +46,15 @@ def post_message(token: str, channel_id: str, body: dict[str, Any]) -> dict[str,
     request = build_request("POST", f"/channels/{channel_id}/messages", token, body)
     with urlopen(request) as response:
         return json.load(response)
+
+
+def add_reaction(token: str, channel_id: str, message_id: str, emoji: str) -> None:
+    """PUT https://discord.com/api/v10/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me"""
+    emoji_code = quote(emoji, safe="")
+    request = build_request(
+        "PUT",
+        f"/channels/{channel_id}/messages/{message_id}/reactions/{emoji_code}/@me",
+        token,
+    )
+    with urlopen(request):
+        return None

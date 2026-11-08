@@ -5,7 +5,13 @@ from urllib.request import Request
 import pytest
 
 import discord_api
-from discord_api import HttpMethod, build_request, get_current_user, post_message
+from discord_api import (
+    HttpMethod,
+    add_reaction,
+    build_request,
+    get_current_user,
+    post_message,
+)
 
 
 def test_build_request_sets_full_url() -> None:
@@ -108,3 +114,16 @@ def test_post_message_build_request(monkeypatch: pytest.MonkeyPatch) -> None:
 
     post_message("dummy-token", "456", body={"content": "hello"})
     assert len(calls) == 1
+
+
+def test_add_reaction_use_put_method(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_urlopen(request: Request) -> BytesIO:
+        assert request.method == "PUT"
+        assert (
+            request.full_url
+            == "https://discord.com/api/v10/channels/456/messages/123456/reactions/%F0%9F%91%8D%F0%9F%8F%BB/@me"
+        )
+        return BytesIO(b"")
+
+    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
+    add_reaction("dummy-token", "456", "123456", "👍🏻")

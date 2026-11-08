@@ -104,6 +104,7 @@ def test_post_message_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:
         assert request.full_url == "https://discord.com/api/v10/channels/456/messages"
         assert request.method == "POST"
         assert request.data == b'{"content": "hello"}'
+        assert request.get_header("Authorization") == "Bot dummy-token"
         calls.append(request)
         return BytesIO(b'{"id": "123", "content": "hello"}')
 
@@ -116,11 +117,12 @@ def test_add_reaction_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[Request] = []
 
     def fake_urlopen(request: Request) -> BytesIO:
-        assert request.method == "PUT"
         assert (
             request.full_url
             == "https://discord.com/api/v10/channels/456/messages/123456/reactions/%F0%9F%91%8D%F0%9F%8F%BB/@me"
         )
+        assert request.method == "PUT"
+        assert request.get_header("Authorization") == "Bot dummy-token"
         calls.append(request)
         return BytesIO(b"")
 

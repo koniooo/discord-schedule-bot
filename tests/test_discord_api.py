@@ -47,15 +47,12 @@ def test_build_request_does_not_set_content_type_without_body() -> None:
 
 
 @pytest.mark.parametrize(
-    ("expected_method", "body"), [("GET", None), ("POST", {}), ("PUT", None)]
+    ("method", "body"), [("GET", None), ("POST", {}), ("PUT", None)]
 )
 def test_build_request_uses_given_method(
-    expected_method: HttpMethod, body: dict[str, Any] | None
+    method: HttpMethod, body: dict[str, Any] | None
 ) -> None:
-    assert (
-        build_request(expected_method, "/x", "dummy-token", body).get_method()
-        == expected_method
-    )
+    assert build_request(method, "/x", "dummy-token", body).get_method() == method
 
 
 def test_build_request_sets_json_body() -> None:
@@ -79,7 +76,7 @@ def test_build_request_rejects_post_without_body() -> None:
         build_request("POST", "/x", "dummy-token")
 
 
-def test_get_current_user(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_current_user_returns_user(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_urlopen(_request: Request) -> BytesIO:
         return BytesIO(b'{"id": "123", "username": "sample-bot"}')
 
@@ -100,7 +97,7 @@ def test_post_message_returns_created_message(monkeypatch: pytest.MonkeyPatch) -
     }
 
 
-def test_post_message_build_request(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_post_message_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[Request] = []
 
     def fake_urlopen(request: Request) -> BytesIO:
@@ -115,7 +112,7 @@ def test_post_message_build_request(monkeypatch: pytest.MonkeyPatch) -> None:
     assert len(calls) == 1
 
 
-def test_add_reaction_build_request(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_add_reaction_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[Request] = []
 
     def fake_urlopen(request: Request) -> BytesIO:

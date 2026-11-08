@@ -50,11 +50,11 @@ def post_message(token: str, channel_id: str, body: dict[str, Any]) -> dict[str,
 
 def add_reaction(token: str, channel_id: str, message_id: str, emoji: str) -> None:
     """PUT https://discord.com/api/v10/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me"""
-    emoji_code = quote(emoji, safe="")
+    encoded_emoji = quote(emoji, safe="")
     request = build_request(
         "PUT",
-        f"/channels/{channel_id}/messages/{message_id}/reactions/{emoji_code}/@me",
+        f"/channels/{channel_id}/messages/{message_id}/reactions/{encoded_emoji}/@me",
         token,
     )
     with urlopen(request):
-        return None
+        pass

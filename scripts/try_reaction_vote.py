@@ -1,12 +1,13 @@
 from datetime import date
+from pprint import pprint
+from urllib.error import HTTPError
 
 from dotenv import load_dotenv
 
 from config import get_required_env
 from discord_api import SUPPRESS_NOTIFICATIONS, add_reaction, post_message
 from schedule import WEEKDAY_NAMES, get_monday_to_sunday_after_next
-
-VOTE_EMOJIS = ("👍", "❓", "👎")
+from vote import VOTE_CHOICES
 
 
 def main() -> None:
@@ -30,9 +31,13 @@ def main() -> None:
                 "flags": SUPPRESS_NOTIFICATIONS,
             },
         )
-        for emoji in VOTE_EMOJIS:
+        for emoji, _label in VOTE_CHOICES:
             add_reaction(token, channel_id, message["id"], emoji)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except HTTPError as error:
+        pprint(error.read().decode())
+        raise

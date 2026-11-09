@@ -4,10 +4,9 @@ from dotenv import load_dotenv
 
 from config import get_required_env
 from discord_api import SUPPRESS_NOTIFICATIONS, add_reaction, post_message
-from schedule import get_monday_to_sunday_after_next
+from schedule import WEEKDAY_NAMES, get_monday_to_sunday_after_next
 
 VOTE_EMOJIS = ("👍", "❓", "👎")
-WEEKDAY_NAMES = ("月", "火", "水", "木", "金", "土", "日")
 
 
 def main() -> None:

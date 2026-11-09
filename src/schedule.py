@@ -2,6 +2,8 @@
 
 from datetime import date, timedelta
 
+WEEKDAY_NAMES = ("月", "火", "水", "木", "金", "土", "日")
+
 
 def get_monday_of_week(day: date) -> date:
     return day - timedelta(days=day.weekday())

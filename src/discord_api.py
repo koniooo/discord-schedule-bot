@@ -1,5 +1,5 @@
 import json
-from typing import Any, Literal
+from typing import Any, Literal, overload
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
@@ -10,6 +10,14 @@ SUPPRESS_NOTIFICATIONS = 1 << 12
 type HttpMethod = Literal["GET", "POST", "PUT"]
 
 
+@overload
+def build_request(
+    method: Literal["GET", "PUT"], path: str, token: str, body: None = None
+) -> Request: ...
+@overload
+def build_request(
+    method: Literal["POST"], path: str, token: str, body: dict[str, Any]
+) -> Request: ...
 def build_request(
     method: HttpMethod, path: str, token: str, body: dict[str, Any] | None = None
 ) -> Request:

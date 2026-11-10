@@ -1,12 +1,11 @@
 from io import BytesIO
-from typing import Any
+from typing import Literal
 from urllib.request import Request
 
 import pytest
 
 import discord_api
 from discord_api import (
-    HttpMethod,
     add_reaction,
     build_request,
     get_current_user,
@@ -46,13 +45,15 @@ def test_build_request_does_not_set_content_type_without_body() -> None:
     assert build_request("GET", "/x", "dummy-token").get_header("Content-type") is None
 
 
-@pytest.mark.parametrize(
-    ("method", "body"), [("GET", None), ("POST", {}), ("PUT", None)]
-)
-def test_build_request_uses_given_method(
-    method: HttpMethod, body: dict[str, Any] | None
+@pytest.mark.parametrize("method", ["GET", "PUT"])
+def test_build_request_uses_given_method_without_body(
+    method: Literal["GET", "PUT"],
 ) -> None:
-    assert build_request(method, "/x", "dummy-token", body).get_method() == method
+    assert build_request(method, "/x", "dummy-token").get_method() == method
+
+
+def test_build_request_uses_post_method_with_body() -> None:
+    assert build_request("POST", "/x", "dummy-token", {}).get_method() == "POST"
 
 
 def test_build_request_sets_json_body() -> None:
@@ -73,7 +74,8 @@ def test_build_request_rejects_path_without_leading_slash() -> None:
 
 def test_build_request_rejects_post_without_body() -> None:
     with pytest.raises(ValueError, match="body"):
-        build_request("POST", "/x", "dummy-token")
+        # Intentionally call POST without body to test the runtime check.
+        build_request("POST", "/x", "dummy-token")  # pyright: ignore[reportArgumentType]
 
 
 def test_get_current_user_returns_user(monkeypatch: pytest.MonkeyPatch) -> None:

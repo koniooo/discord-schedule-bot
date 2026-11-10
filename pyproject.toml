@@ -31,6 +31,7 @@ pythonVersion = "3.14"
 typeCheckingMode = "strict"
 venvPath = "."
 venv = ".venv"
+reportUnnecessaryTypeIgnoreComment = true
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

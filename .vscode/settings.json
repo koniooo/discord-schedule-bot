@@ -7,5 +7,12 @@
       "source.organizeImports.ruff": "always"
     }
   },
-  "cSpell.words": ["dotenv"]
+  "cSpell.words": [
+    "dotenv",
+    "pytest",
+    "pythonpath",
+    "setuptools",
+    "testpaths",
+    "venv"
+  ]
 }

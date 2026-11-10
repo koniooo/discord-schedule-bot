@@ -10,6 +10,7 @@ from discord_api import (
     build_request,
     get_current_user,
     post_message,
+    start_thread_from_message,
 )
 
 
@@ -78,15 +79,6 @@ def test_build_request_rejects_post_without_body() -> None:
         build_request("POST", "/x", "dummy-token")  # pyright: ignore[reportArgumentType]
 
 
-def test_get_current_user_returns_user(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fake_urlopen(_request: Request) -> BytesIO:
-        return BytesIO(b'{"id": "123", "username": "sample-bot"}')
-
-    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
-
-    assert get_current_user("dummy-token") == {"id": "123", "username": "sample-bot"}
-
-
 def test_get_current_user_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[Request] = []
 
@@ -104,16 +96,13 @@ def test_get_current_user_builds_request(monkeypatch: pytest.MonkeyPatch) -> Non
     assert request.get_header("Authorization") == "Bot dummy-token"
 
 
-def test_post_message_returns_created_message(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_current_user_returns_user(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_urlopen(_request: Request) -> BytesIO:
-        return BytesIO(b'{"id": "123", "content": "hello"}')
+        return BytesIO(b'{"id": "123", "username": "sample-bot"}')
 
     monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
 
-    assert post_message("dummy-token", "456", {"content": "hello"}) == {
-        "id": "123",
-        "content": "hello",
-    }
+    assert get_current_user("dummy-token") == {"id": "123", "username": "sample-bot"}
 
 
 def test_post_message_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -130,8 +119,56 @@ def test_post_message_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:
     request = calls[0]
     assert request.method == "POST"
     assert request.full_url == "https://discord.com/api/v10/channels/456/messages"
-    assert request.data == b'{"content": "hello"}'
     assert request.get_header("Authorization") == "Bot dummy-token"
+    assert request.data == b'{"content": "hello"}'
+
+
+def test_post_message_returns_created_message(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_urlopen(_request: Request) -> BytesIO:
+        return BytesIO(b'{"id": "123", "content": "hello"}')
+
+    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
+
+    assert post_message("dummy-token", "456", {"content": "hello"}) == {
+        "id": "123",
+        "content": "hello",
+    }
+
+
+def test_start_thread_from_message_builds_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[Request] = []
+
+    def fake_urlopen(request: Request) -> BytesIO:
+        calls.append(request)
+        return BytesIO(b'{"id": "789", "name": "thread_name"}')
+
+    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
+    start_thread_from_message("dummy-token", "123456", "345678", "thread_name")
+
+    assert len(calls) == 1
+    request = calls[0]
+    assert request.method == "POST"
+    assert (
+        request.full_url
+        == "https://discord.com/api/v10/channels/123456/messages/345678/threads"
+    )
+    assert request.get_header("Authorization") == "Bot dummy-token"
+    assert request.data == b'{"name": "thread_name", "auto_archive_duration": 10080}'
+
+
+def test_start_thread_from_message_returns_created_thread(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_urlopen(_request: Request) -> BytesIO:
+        return BytesIO(b'{"id": "789", "name": "name_from_response"}')
+
+    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
+
+    assert start_thread_from_message(
+        "dummy-token", "456789", "123456", "thread_name"
+    ) == {"id": "789", "name": "name_from_response"}
 
 
 def test_add_reaction_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:

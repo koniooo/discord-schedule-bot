@@ -57,6 +57,21 @@ def post_message(token: str, channel_id: str, body: dict[str, Any]) -> dict[str,
         return json.load(response)
 
 
+def start_thread_from_message(
+    token: str, channel_id: str, message_id: str, name: str
+) -> dict[str, Any]:
+    """POST https://discord.com/api/v10/channels/{channel_id}/messages/{message_id}/threads"""
+    body = {"name": name, "auto_archive_duration": 60 * 24 * 7}
+    request = build_request(
+        "POST",
+        f"/channels/{channel_id}/messages/{message_id}/threads",
+        token,
+        body=body,
+    )
+    with urlopen(request) as response:
+        return json.load(response)
+
+
 def add_reaction(token: str, channel_id: str, message_id: str, emoji: str) -> None:
     """PUT https://discord.com/api/v10/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me"""
     encoded_emoji = quote(emoji, safe="")

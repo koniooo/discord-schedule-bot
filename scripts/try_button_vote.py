@@ -6,8 +6,7 @@ from dotenv import load_dotenv
 
 from config import get_required_env
 from discord_api import SUPPRESS_NOTIFICATIONS, post_message
-from schedule import WEEKDAY_NAMES, get_monday_to_sunday_after_next
-from vote import VOTE_CHOICES
+from schedule import get_monday_to_sunday_after_next
 
 IS_COMPONENTS_V2 = 1 << 15
 
@@ -24,7 +23,7 @@ def main() -> None:
             "allowed_mentions": {"parse": ["everyone"]},
         },
     )
-    for day in get_monday_to_sunday_after_next(date.today()):
+    for _day in get_monday_to_sunday_after_next(date.today()):
         post_message(
             token,
             channel_id,

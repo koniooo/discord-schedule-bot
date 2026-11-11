@@ -1,7 +1,12 @@
 import os
 from typing import Literal
 
-type EnvVarName = Literal["DISCORD_BOT_TOKEN", "DISCORD_CHANNEL_ID"]
+type EnvVarName = Literal[
+    "DISCORD_BOT_TOKEN",
+    "DISCORD_CHANNEL_ID",
+    "DISCORD_GUILD_ID",
+    "DISCORD_MASTER_USER_ID",
+]
 
 
 def get_required_env(name: EnvVarName) -> str:

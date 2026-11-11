@@ -13,6 +13,7 @@
     "pythonpath",
     "setuptools",
     "testpaths",
+    "unpadded",
     "venv"
   ]
 }

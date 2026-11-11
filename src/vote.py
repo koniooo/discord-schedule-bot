@@ -1,6 +1,3 @@
-VOTE_CHOICES = (("👍", "参加可"), ("❓", "未定"), ("👎", "参加不可"))
-
-
 def find_most_voted_day(vote_counts: dict[str, int]) -> tuple[str, int] | None:
     if not vote_counts:
         return None

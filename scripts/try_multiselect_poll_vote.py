@@ -6,7 +6,11 @@ from dotenv import load_dotenv
 
 from config import get_required_env
 from discord_api import post_message, start_thread_from_message
-from schedule import WEEKDAY_NAMES, format_date_range, get_monday_to_sunday_after_next
+from schedule import (
+    format_date_range,
+    format_date_with_weekday,
+    get_monday_to_sunday_after_next,
+)
 
 
 def main() -> None:
@@ -17,7 +21,7 @@ def main() -> None:
     answers = [
         {
             "poll_media": {
-                "text": f"{day.month}/{day.day} ({WEEKDAY_NAMES[day.weekday()]})",
+                "text": format_date_with_weekday(day),
             }
         }
         for day in candidate_days

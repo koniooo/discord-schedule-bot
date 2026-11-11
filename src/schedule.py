@@ -2,7 +2,7 @@
 
 from datetime import date, timedelta
 
-WEEKDAY_NAMES = ("月", "火", "水", "木", "金", "土", "日")
+_WEEKDAY_NAMES = ("月", "火", "水", "木", "金", "土", "日")
 
 
 def get_monday_of_week(day: date) -> date:
@@ -16,6 +16,10 @@ def get_seven_days_from(start: date) -> list[date]:
 def get_monday_to_sunday_after_next(day: date) -> list[date]:
     monday_after_next = get_monday_of_week(day) + timedelta(weeks=2)
     return get_seven_days_from(monday_after_next)
+
+
+def format_date_with_weekday(day: date) -> str:
+    return f"{day.month}/{day.day} ({_WEEKDAY_NAMES[day.weekday()]})"
 
 
 def format_date_range(start: date, end: date) -> str:

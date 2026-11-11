@@ -4,6 +4,7 @@ import pytest
 
 from schedule import (
     format_date_range,
+    format_date_with_weekday,
     get_monday_of_week,
     get_monday_to_sunday_after_next,
     get_seven_days_from,
@@ -55,6 +56,19 @@ def test_get_monday_to_sunday_after_next_returns_same_result_for_any_day_in_week
         date(2026, 11, 14),
         date(2026, 11, 15),
     ]
+
+
+@pytest.mark.parametrize(
+    ("day", "expected_label"),
+    [
+        pytest.param(date(2026, 11, 23), "11/23 (月)", id="monday"),
+        pytest.param(date(2027, 1, 3), "1/3 (日)", id="sunday_single_digits"),
+    ],
+)
+def test_format_date_with_weekday_returns_unpadded_date_and_japanese_weekday(
+    day: date, expected_label: str
+) -> None:
+    assert format_date_with_weekday(day) == expected_label
 
 
 @pytest.mark.parametrize(

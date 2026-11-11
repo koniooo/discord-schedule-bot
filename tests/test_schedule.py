@@ -3,6 +3,7 @@ from datetime import date
 import pytest
 
 from schedule import (
+    format_date_range,
     get_monday_of_week,
     get_monday_to_sunday_after_next,
     get_seven_days_from,
@@ -54,3 +55,20 @@ def test_get_monday_to_sunday_after_next_returns_same_result_for_any_day_in_week
         date(2026, 11, 14),
         date(2026, 11, 15),
     ]
+
+
+@pytest.mark.parametrize(
+    ("start", "end", "expected_label"),
+    [
+        pytest.param(
+            date(2026, 11, 23), date(2026, 11, 29), "11/23-29", id="in_same_month"
+        ),
+        pytest.param(
+            date(2026, 11, 30), date(2026, 12, 6), "11/30-12/6", id="across_months"
+        ),
+    ],
+)
+def test_format_date_range_shows_end_month_only_when_different(
+    start: date, end: date, expected_label: str
+) -> None:
+    assert format_date_range(start, end) == expected_label

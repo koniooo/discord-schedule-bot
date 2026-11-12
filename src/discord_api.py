@@ -1,4 +1,5 @@
 import json
+from collections.abc import Mapping
 from typing import Any, Literal, overload
 from urllib.parse import quote
 from urllib.request import Request, urlopen
@@ -16,10 +17,10 @@ def build_request(
 ) -> Request: ...
 @overload
 def build_request(
-    method: Literal["POST"], path: str, token: str, body: dict[str, Any]
+    method: Literal["POST"], path: str, token: str, body: Mapping[str, Any]
 ) -> Request: ...
 def build_request(
-    method: HttpMethod, path: str, token: str, body: dict[str, Any] | None = None
+    method: HttpMethod, path: str, token: str, body: Mapping[str, Any] | None = None
 ) -> Request:
     if not path.startswith("/"):
         raise ValueError(f"path must start with '/': {path}")
@@ -50,7 +51,9 @@ def get_current_user(token: str) -> dict[str, Any]:
         return json.load(response)
 
 
-def post_message(token: str, channel_id: str, body: dict[str, Any]) -> dict[str, Any]:
+def post_message(
+    token: str, channel_id: str, body: Mapping[str, Any]
+) -> dict[str, Any]:
     """POST https://discord.com/api/v10/channels/{channel_id}/messages"""
     request = build_request("POST", f"/channels/{channel_id}/messages", token, body)
     with urlopen(request) as response:

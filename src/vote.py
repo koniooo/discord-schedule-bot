@@ -2,7 +2,7 @@ from datetime import date
 from typing import TypedDict
 
 from discord_api import AllowedMentions, PollAnswer, PollCreateRequest
-from schedule import format_date_with_weekday
+from schedule import format_date_range, format_date_with_weekday
 
 NO_AVAILABLE_DAY_TEXT = "どの日も難しい"
 
@@ -14,6 +14,8 @@ VOTE_ANNOUNCEMENT_TEXT = (
 POLL_QUESTION_TEXT = "参加可能日 (22:00～23:30)"
 
 VOTE_DURATION_HOURS = 24 * 7
+
+COMMENT_THREAD_NAME_SUFFIX = "💬コメント"
 
 
 class VoteMessage(TypedDict):
@@ -41,3 +43,8 @@ def build_vote_message(candidate_days: list[date]) -> VoteMessage:
             "allow_multiselect": True,
         },
     }
+
+
+def format_comment_thread_name(candidate_days: list[date]) -> str:
+    date_range = format_date_range(candidate_days[0], candidate_days[-1])
+    return f"{date_range} {COMMENT_THREAD_NAME_SUFFIX}"

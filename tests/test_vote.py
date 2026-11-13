@@ -1,13 +1,15 @@
 from datetime import date
 
-from schedule import format_date_with_weekday
+from schedule import format_date_range, format_date_with_weekday
 from vote import (
+    COMMENT_THREAD_NAME_SUFFIX,
     NO_AVAILABLE_DAY_TEXT,
     POLL_QUESTION_TEXT,
     VOTE_ANNOUNCEMENT_TEXT,
     VOTE_DURATION_HOURS,
     build_poll_answers,
     build_vote_message,
+    format_comment_thread_name,
 )
 
 
@@ -39,3 +41,18 @@ def test_build_vote_message_builds_poll_from_candidate_days() -> None:
         "duration": VOTE_DURATION_HOURS,
         "allow_multiselect": True,
     }
+
+
+def test_format_comment_thread_name_shows_date_range_and_suffix() -> None:
+    first_day = date(2026, 11, 30)
+    last_day = date(2026, 12, 6)
+    assert (
+        format_comment_thread_name(
+            [
+                first_day,
+                date(2026, 12, 1),
+                last_day,
+            ]
+        )
+        == f"{format_date_range(first_day, last_day)} {COMMENT_THREAD_NAME_SUFFIX}"
+    )

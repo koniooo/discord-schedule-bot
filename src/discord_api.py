@@ -1,6 +1,6 @@
 import json
 from collections.abc import Mapping
-from typing import Any, Literal, overload
+from typing import Any, Literal, TypedDict, overload
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
@@ -9,6 +9,26 @@ USER_AGENT = "DiscordBot (https://github.com/koniooo/discord-schedule-bot, 0.1.0
 SUPPRESS_NOTIFICATIONS = 1 << 12
 
 type HttpMethod = Literal["GET", "POST", "PUT"]
+type AllowedMentionType = Literal["roles", "users", "everyone"]
+
+
+class PollMedia(TypedDict):
+    text: str
+
+
+class PollAnswer(TypedDict):
+    poll_media: PollMedia
+
+
+class AllowedMentions(TypedDict):
+    parse: list[AllowedMentionType]
+
+
+class PollCreateRequest(TypedDict):
+    question: PollMedia
+    answers: list[PollAnswer]
+    duration: int
+    allow_multiselect: bool
 
 
 @overload

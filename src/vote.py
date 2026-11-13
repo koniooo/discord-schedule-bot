@@ -1,6 +1,7 @@
 from datetime import date
-from typing import Literal, TypedDict
+from typing import TypedDict
 
+from discord_api import AllowedMentions, PollAnswer, PollCreateRequest
 from schedule import format_date_with_weekday
 
 NO_AVAILABLE_DAY_TEXT = "どの日も難しい"
@@ -13,28 +14,6 @@ VOTE_ANNOUNCEMENT_TEXT = (
 POLL_QUESTION_TEXT = "参加可能日 (22:00～23:30)"
 
 VOTE_DURATION_HOURS = 24 * 7
-
-
-type AllowedMentionType = Literal["roles", "users", "everyone"]
-
-
-class PollMedia(TypedDict):
-    text: str
-
-
-class PollAnswer(TypedDict):
-    poll_media: PollMedia
-
-
-class AllowedMentions(TypedDict):
-    parse: list[AllowedMentionType]
-
-
-class PollCreateRequest(TypedDict):
-    question: PollMedia
-    answers: list[PollAnswer]
-    duration: int
-    allow_multiselect: bool
 
 
 class VoteMessage(TypedDict):

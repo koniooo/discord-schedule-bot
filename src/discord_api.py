@@ -34,6 +34,10 @@ class PollCreateRequest(TypedDict):
     allow_multiselect: bool
 
 
+class Message(TypedDict):
+    id: MessageId
+
+
 @overload
 def build_request(
     method: Literal["GET", "PUT"], path: str, token: str, body: None = None
@@ -74,9 +78,7 @@ def get_current_user(token: str) -> dict[str, Any]:
         return json.load(response)
 
 
-def post_message(
-    token: str, channel_id: ChannelId, body: Mapping[str, Any]
-) -> dict[str, Any]:
+def post_message(token: str, channel_id: ChannelId, body: Mapping[str, Any]) -> Message:
     """POST https://discord.com/api/v10/channels/{channel_id}/messages"""
     request = build_request("POST", f"/channels/{channel_id}/messages", token, body)
     with urlopen(request) as response:

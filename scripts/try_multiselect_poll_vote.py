@@ -5,7 +5,7 @@ from urllib.error import HTTPError
 from dotenv import load_dotenv
 
 from config import get_required_env
-from discord_api import ChannelId, MessageId, post_message, start_thread_from_message
+from discord_api import ChannelId, post_message, start_thread_from_message
 from schedule import (
     format_date_range,
     get_monday_to_sunday_after_next,
@@ -24,7 +24,7 @@ def main() -> None:
     thread_name = (
         f"{format_date_range(candidate_days[0], candidate_days[-1])} 💬コメント"
     )
-    start_thread_from_message(token, channel_id, MessageId(message["id"]), thread_name)
+    start_thread_from_message(token, channel_id, message["id"], thread_name)
 
 
 if __name__ == "__main__":

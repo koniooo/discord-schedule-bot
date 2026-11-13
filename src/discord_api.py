@@ -1,6 +1,6 @@
 import json
 from collections.abc import Mapping
-from typing import Any, Literal, NewType, TypedDict, overload
+from typing import Any, Literal, NewType, NotRequired, ReadOnly, TypedDict, overload
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
@@ -8,31 +8,11 @@ DISCORD_API_BASE_URL = "https://discord.com/api/v10"
 USER_AGENT = "DiscordBot (https://github.com/koniooo/discord-schedule-bot, 0.1.0)"
 SUPPRESS_NOTIFICATIONS = 1 << 12
 
+type HttpMethod = Literal["GET", "POST", "PUT"]
+
 UserId = NewType("UserId", str)
 ChannelId = NewType("ChannelId", str)
 MessageId = NewType("MessageId", str)
-
-type HttpMethod = Literal["GET", "POST", "PUT"]
-type AllowedMentionType = Literal["roles", "users", "everyone"]
-
-
-class PollMedia(TypedDict):
-    text: str
-
-
-class PollAnswer(TypedDict):
-    poll_media: PollMedia
-
-
-class AllowedMentions(TypedDict):
-    parse: list[AllowedMentionType]
-
-
-class PollCreateRequest(TypedDict):
-    question: PollMedia
-    answers: list[PollAnswer]
-    duration: int
-    allow_multiselect: bool
 
 
 class User(TypedDict):
@@ -45,6 +25,34 @@ class Message(TypedDict):
 
 class Channel(TypedDict):
     id: ChannelId
+
+
+class PollMedia(TypedDict):
+    text: str
+
+
+class PollAnswer(TypedDict):
+    poll_media: PollMedia
+
+
+class PollCreateRequest(TypedDict):
+    question: PollMedia
+    answers: list[PollAnswer]
+    duration: int
+    allow_multiselect: bool
+
+
+type AllowedMentionType = Literal["roles", "users", "everyone"]
+
+
+class AllowedMentions(TypedDict):
+    parse: list[AllowedMentionType]
+
+
+class CreateMessageBody(TypedDict):
+    content: ReadOnly[str]
+    allowed_mentions: ReadOnly[NotRequired[AllowedMentions]]
+    poll: ReadOnly[NotRequired[PollCreateRequest]]
 
 
 @overload
@@ -87,7 +95,7 @@ def get_current_user(token: str) -> User:
         return json.load(response)
 
 
-def post_message(token: str, channel_id: ChannelId, body: Mapping[str, Any]) -> Message:
+def post_message(token: str, channel_id: ChannelId, body: CreateMessageBody) -> Message:
     """POST https://discord.com/api/v10/channels/{channel_id}/messages"""
     request = build_request("POST", f"/channels/{channel_id}/messages", token, body)
     with urlopen(request) as response:

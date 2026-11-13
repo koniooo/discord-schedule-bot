@@ -6,6 +6,8 @@ import pytest
 
 import discord_api
 from discord_api import (
+    ChannelId,
+    MessageId,
     add_reaction,
     build_request,
     get_current_user,
@@ -113,7 +115,7 @@ def test_post_message_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:
         return BytesIO(b'{"id": "123", "content": "hello"}')
 
     monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
-    post_message("dummy-token", "456", body={"content": "hello"})
+    post_message("dummy-token", ChannelId("456"), body={"content": "hello"})
 
     assert len(calls) == 1
     request = calls[0]
@@ -129,7 +131,7 @@ def test_post_message_returns_created_message(monkeypatch: pytest.MonkeyPatch) -
 
     monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
 
-    assert post_message("dummy-token", "456", {"content": "hello"}) == {
+    assert post_message("dummy-token", ChannelId("456"), {"content": "hello"}) == {
         "id": "123",
         "content": "hello",
     }
@@ -145,7 +147,9 @@ def test_start_thread_from_message_builds_request(
         return BytesIO(b'{"id": "789", "name": "thread_name"}')
 
     monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
-    start_thread_from_message("dummy-token", "123456", "345678", "thread_name")
+    start_thread_from_message(
+        "dummy-token", ChannelId("123456"), MessageId("345678"), "thread_name"
+    )
 
     assert len(calls) == 1
     request = calls[0]
@@ -167,7 +171,7 @@ def test_start_thread_from_message_returns_created_thread(
     monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
 
     assert start_thread_from_message(
-        "dummy-token", "456789", "123456", "thread_name"
+        "dummy-token", ChannelId("456789"), MessageId("123456"), "thread_name"
     ) == {"id": "789", "name": "name_from_response"}
 
 
@@ -179,7 +183,7 @@ def test_add_reaction_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:
         return BytesIO(b"")
 
     monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
-    add_reaction("dummy-token", "456", "123456", "👍🏻")
+    add_reaction("dummy-token", ChannelId("456"), MessageId("123456"), "👍🏻")
 
     assert len(calls) == 1
     request = calls[0]

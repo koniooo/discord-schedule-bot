@@ -1,12 +1,15 @@
 import json
 from collections.abc import Mapping
-from typing import Any, Literal, TypedDict, overload
+from typing import Any, Literal, NewType, TypedDict, overload
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 DISCORD_API_BASE_URL = "https://discord.com/api/v10"
 USER_AGENT = "DiscordBot (https://github.com/koniooo/discord-schedule-bot, 0.1.0)"
 SUPPRESS_NOTIFICATIONS = 1 << 12
+
+ChannelId = NewType("ChannelId", str)
+MessageId = NewType("MessageId", str)
 
 type HttpMethod = Literal["GET", "POST", "PUT"]
 type AllowedMentionType = Literal["roles", "users", "everyone"]
@@ -72,7 +75,7 @@ def get_current_user(token: str) -> dict[str, Any]:
 
 
 def post_message(
-    token: str, channel_id: str, body: Mapping[str, Any]
+    token: str, channel_id: ChannelId, body: Mapping[str, Any]
 ) -> dict[str, Any]:
     """POST https://discord.com/api/v10/channels/{channel_id}/messages"""
     request = build_request("POST", f"/channels/{channel_id}/messages", token, body)
@@ -81,7 +84,7 @@ def post_message(
 
 
 def start_thread_from_message(
-    token: str, channel_id: str, message_id: str, name: str
+    token: str, channel_id: ChannelId, message_id: MessageId, name: str
 ) -> dict[str, Any]:
     """POST https://discord.com/api/v10/channels/{channel_id}/messages/{message_id}/threads"""
     body = {"name": name, "auto_archive_duration": 60 * 24 * 7}
@@ -95,7 +98,9 @@ def start_thread_from_message(
         return json.load(response)
 
 
-def add_reaction(token: str, channel_id: str, message_id: str, emoji: str) -> None:
+def add_reaction(
+    token: str, channel_id: ChannelId, message_id: MessageId, emoji: str
+) -> None:
     """PUT https://discord.com/api/v10/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me"""
     encoded_emoji = quote(emoji, safe="")
     request = build_request(

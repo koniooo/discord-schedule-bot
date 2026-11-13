@@ -38,6 +38,10 @@ class Message(TypedDict):
     id: MessageId
 
 
+class Channel(TypedDict):
+    id: ChannelId
+
+
 @overload
 def build_request(
     method: Literal["GET", "PUT"], path: str, token: str, body: None = None
@@ -87,7 +91,7 @@ def post_message(token: str, channel_id: ChannelId, body: Mapping[str, Any]) -> 
 
 def start_thread_from_message(
     token: str, channel_id: ChannelId, message_id: MessageId, name: str
-) -> dict[str, Any]:
+) -> Channel:
     """POST https://discord.com/api/v10/channels/{channel_id}/messages/{message_id}/threads"""
     body = {"name": name, "auto_archive_duration": 60 * 24 * 7}
     request = build_request(

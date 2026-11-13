@@ -6,7 +6,6 @@ from urllib.request import Request, urlopen
 
 DISCORD_API_BASE_URL = "https://discord.com/api/v10"
 USER_AGENT = "DiscordBot (https://github.com/koniooo/discord-schedule-bot, 0.1.0)"
-SUPPRESS_NOTIFICATIONS = 1 << 12
 
 type HttpMethod = Literal["GET", "POST", "PUT"]
 

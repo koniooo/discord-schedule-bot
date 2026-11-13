@@ -8,6 +8,7 @@ DISCORD_API_BASE_URL = "https://discord.com/api/v10"
 USER_AGENT = "DiscordBot (https://github.com/koniooo/discord-schedule-bot, 0.1.0)"
 SUPPRESS_NOTIFICATIONS = 1 << 12
 
+UserId = NewType("UserId", str)
 ChannelId = NewType("ChannelId", str)
 MessageId = NewType("MessageId", str)
 
@@ -32,6 +33,10 @@ class PollCreateRequest(TypedDict):
     answers: list[PollAnswer]
     duration: int
     allow_multiselect: bool
+
+
+class User(TypedDict):
+    id: UserId
 
 
 class Message(TypedDict):
@@ -75,7 +80,7 @@ def build_request(
     )
 
 
-def get_current_user(token: str) -> dict[str, Any]:
+def get_current_user(token: str) -> User:
     """GET https://discord.com/api/v10/users/@me"""
     request = build_request("GET", "/users/@me", token)
     with urlopen(request) as response:

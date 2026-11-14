@@ -60,7 +60,7 @@ class AllowedMentions(TypedDict):
     parse: list[AllowedMentionType]
 
 
-class CreateMessageBody(TypedDict):
+class MessageCreateRequest(TypedDict):
     content: ReadOnly[str]
     allowed_mentions: ReadOnly[NotRequired[AllowedMentions]]
     poll: ReadOnly[NotRequired[PollCreateRequest]]
@@ -110,7 +110,9 @@ def get_current_user(token: str) -> User:
         return json.load(response)
 
 
-def post_message(token: str, channel_id: ChannelId, body: CreateMessageBody) -> Message:
+def post_message(
+    token: str, channel_id: ChannelId, body: MessageCreateRequest
+) -> Message:
     """POST https://discord.com/api/v10/channels/{channel_id}/messages"""
     request = build_request("POST", f"/channels/{channel_id}/messages", token, body)
     with urlopen(request) as response:

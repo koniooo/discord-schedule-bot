@@ -12,16 +12,13 @@ type HttpMethod = Literal["GET", "POST", "PUT"]
 UserId = NewType("UserId", str)
 ChannelId = NewType("ChannelId", str)
 MessageId = NewType("MessageId", str)
+AnswerId = NewType("AnswerId", int)
 GuildId = NewType("GuildId", str)
 
 
 class User(TypedDict):
     id: UserId
     bot: NotRequired[bool]
-
-
-class Message(TypedDict):
-    id: MessageId
 
 
 class Channel(TypedDict):
@@ -41,6 +38,19 @@ class PollCreateRequest(TypedDict):
     answers: list[PollAnswer]
     duration: int
     allow_multiselect: bool
+
+
+class PollAnswerResponse(PollAnswer):
+    answer_id: AnswerId
+
+
+class PollResponse(TypedDict):
+    answers: list[PollAnswerResponse]
+
+
+class Message(TypedDict):
+    id: MessageId
+    poll: NotRequired[PollResponse]
 
 
 type AllowedMentionType = Literal["roles", "users", "everyone"]

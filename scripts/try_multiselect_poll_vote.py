@@ -5,26 +5,16 @@ from urllib.error import HTTPError
 from dotenv import load_dotenv
 
 from config import get_required_env
-from discord_api import ChannelId, post_message, start_thread_from_message
-from schedule import (
-    format_date_range,
-    get_monday_to_sunday_after_next,
-)
-from vote import build_vote_message
+from discord_api import ChannelId
+from jobs import start_vote
 
 
 def main() -> None:
     load_dotenv()
     token = get_required_env("DISCORD_BOT_TOKEN")
     channel_id = ChannelId(get_required_env("DISCORD_CHANNEL_ID"))
-    candidate_days = get_monday_to_sunday_after_next(date.today())
 
-    message = post_message(token, channel_id, build_vote_message(candidate_days))
-
-    thread_name = (
-        f"{format_date_range(candidate_days[0], candidate_days[-1])} 💬コメント"
-    )
-    start_thread_from_message(token, channel_id, message["id"], thread_name)
+    start_vote(token, channel_id, date.today())
 
 
 if __name__ == "__main__":

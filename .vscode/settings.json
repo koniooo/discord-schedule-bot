@@ -8,6 +8,7 @@
     }
   },
   "cSpell.words": [
+    "delenv",
     "dotenv",
     "pytest",
     "pythonpath",

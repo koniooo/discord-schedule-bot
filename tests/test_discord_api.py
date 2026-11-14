@@ -7,10 +7,12 @@ import pytest
 import discord_api
 from discord_api import (
     ChannelId,
+    GuildId,
     MessageId,
     add_reaction,
     build_request,
     get_current_user,
+    list_guild_members,
     post_message,
     start_thread_from_message,
 )
@@ -183,6 +185,7 @@ def test_add_reaction_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:
         return BytesIO(b"")
 
     monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
+
     add_reaction("dummy-token", ChannelId("456"), MessageId("123456"), "👍🏻")
 
     assert len(calls) == 1
@@ -193,3 +196,39 @@ def test_add_reaction_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:
         == "https://discord.com/api/v10/channels/456/messages/123456/reactions/%F0%9F%91%8D%F0%9F%8F%BB/@me"
     )
     assert request.get_header("Authorization") == "Bot dummy-token"
+
+
+def test_list_guild_members_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[Request] = []
+
+    def fake_urlopen(request: Request) -> BytesIO:
+        calls.append(request)
+        return BytesIO(b"[]")
+
+    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
+
+    list_guild_members("dummy-token", GuildId("123456789"))
+
+    assert len(calls) == 1
+    request = calls[0]
+    assert request.method == "GET"
+    assert (
+        request.full_url
+        == "https://discord.com/api/v10/guilds/123456789/members?limit=1000"
+    )
+    assert request.get_header("Authorization") == "Bot dummy-token"
+
+
+def test_list_guild_members_returns_members(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_urlopen(_request: Request) -> BytesIO:
+        return BytesIO(
+            b'[{"user": {"id": "12345", "bot": true}}, {"user": {"id": "345677"}}]'
+        )
+
+    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
+
+    members = list_guild_members("dummy-token", GuildId("987765"))
+    assert members == [
+        {"user": {"id": "12345", "bot": True}},
+        {"user": {"id": "345677"}},
+    ]

@@ -12,10 +12,12 @@ type HttpMethod = Literal["GET", "POST", "PUT"]
 UserId = NewType("UserId", str)
 ChannelId = NewType("ChannelId", str)
 MessageId = NewType("MessageId", str)
+GuildId = NewType("GuildId", str)
 
 
 class User(TypedDict):
     id: UserId
+    bot: NotRequired[bool]
 
 
 class Message(TypedDict):
@@ -52,6 +54,10 @@ class CreateMessageBody(TypedDict):
     content: ReadOnly[str]
     allowed_mentions: ReadOnly[NotRequired[AllowedMentions]]
     poll: ReadOnly[NotRequired[PollCreateRequest]]
+
+
+class GuildMember(TypedDict):
+    user: User
 
 
 @overload
@@ -128,3 +134,10 @@ def add_reaction(
     )
     with urlopen(request):
         pass
+
+
+def list_guild_members(token: str, guild_id: GuildId) -> list[GuildMember]:
+    """GET https://discord.com/api/v10/guilds/{guild_id}/members?limit=1000"""
+    request = build_request("GET", f"/guilds/{guild_id}/members?limit=1000", token)
+    with urlopen(request) as response:
+        return json.load(response)

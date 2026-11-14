@@ -11,6 +11,7 @@ from discord_api import (
     MessageId,
     add_reaction,
     build_request,
+    get_channel_messages,
     get_current_user,
     list_guild_members,
     post_message,
@@ -231,4 +232,52 @@ def test_list_guild_members_returns_members(monkeypatch: pytest.MonkeyPatch) -> 
     assert members == [
         {"user": {"id": "12345", "bot": True}},
         {"user": {"id": "345677"}},
+    ]
+
+
+def test_get_channel_messages_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[Request] = []
+
+    def fake_urlopen(request: Request) -> BytesIO:
+        calls.append(request)
+        return BytesIO(b"[]")
+
+    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
+
+    get_channel_messages("dummy-token", ChannelId("123456"))
+
+    assert len(calls) == 1
+    request = calls[0]
+    assert request.method == "GET"
+    assert (
+        request.full_url
+        == "https://discord.com/api/v10/channels/123456/messages?limit=100"
+    )
+    assert request.get_header("Authorization") == "Bot dummy-token"
+
+
+def test_get_channel_messages_returns_messages(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_urlopen(_request: Request) -> BytesIO:
+        return BytesIO(
+            '[{"id": "1002", "author": {"id": "2001", "bot": true}, '
+            '"poll": {"answers": ['
+            '{"answer_id": 1, "poll_media": {"text": "11/23 (月)"}}, '
+            '{"answer_id": 2, "poll_media": {"text": "どの日も難しい"}}]}}, '
+            '{"id": "1001", "author": {"id": "2002"}}]'.encode()
+        )
+
+    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
+
+    assert get_channel_messages("dummy-token", ChannelId("456")) == [
+        {
+            "id": "1002",
+            "author": {"id": "2001", "bot": True},
+            "poll": {
+                "answers": [
+                    {"answer_id": 1, "poll_media": {"text": "11/23 (月)"}},
+                    {"answer_id": 2, "poll_media": {"text": "どの日も難しい"}},
+                ]
+            },
+        },
+        {"id": "1001", "author": {"id": "2002"}},
     ]

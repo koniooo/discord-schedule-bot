@@ -50,6 +50,7 @@ class PollResponse(TypedDict):
 
 class Message(TypedDict):
     id: MessageId
+    author: User
     poll: NotRequired[PollResponse]
 
 
@@ -151,5 +152,12 @@ def add_reaction(
 def list_guild_members(token: str, guild_id: GuildId) -> list[GuildMember]:
     """GET https://discord.com/api/v10/guilds/{guild_id}/members?limit=1000"""
     request = build_request("GET", f"/guilds/{guild_id}/members?limit=1000", token)
+    with urlopen(request) as response:
+        return json.load(response)
+
+
+def get_channel_messages(token: str, channel_id: ChannelId) -> list[Message]:
+    """GET https://discord.com/api/v10/channels/{channel_id}/messages?limit=100"""
+    request = build_request("GET", f"/channels/{channel_id}/messages?limit=100", token)
     with urlopen(request) as response:
         return json.load(response)

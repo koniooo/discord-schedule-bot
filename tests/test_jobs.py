@@ -4,7 +4,14 @@ from typing import TypedDict
 import pytest
 
 import jobs
-from discord_api import Channel, ChannelId, Message, MessageCreateRequest, MessageId
+from discord_api import (
+    Channel,
+    ChannelId,
+    Message,
+    MessageCreateRequest,
+    MessageId,
+    UserId,
+)
 from jobs import start_vote
 from schedule import get_monday_to_sunday_after_next
 from vote import build_vote_message, format_comment_thread_name
@@ -32,7 +39,7 @@ def test_start_vote_posts_vote_message_and_starts_comment_thread(
         _token: str, channel_id: ChannelId, body: MessageCreateRequest
     ) -> Message:
         post_message_calls.append({"channel_id": channel_id, "body": body})
-        return {"id": vote_message_id}
+        return {"id": vote_message_id, "author": {"id": UserId("")}}
 
     def fake_start_thread_from_message(
         _token: str, channel_id: ChannelId, message_id: MessageId, name: str

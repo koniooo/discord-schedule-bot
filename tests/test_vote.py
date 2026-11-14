@@ -46,6 +46,7 @@ def test_build_vote_message_builds_poll_from_candidate_days() -> None:
 def test_format_comment_thread_name_shows_date_range_and_suffix() -> None:
     first_day = date(2026, 11, 30)
     last_day = date(2026, 12, 6)
+
     assert (
         format_comment_thread_name(
             [

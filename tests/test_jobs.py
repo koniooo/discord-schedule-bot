@@ -14,7 +14,7 @@ from discord_api import (
 )
 from jobs import start_vote
 from schedule import get_monday_to_sunday_after_next
-from vote import build_vote_message, format_comment_thread_name
+from vote import build_vote_message
 
 
 def test_start_vote_posts_vote_message_and_starts_comment_thread(
@@ -33,7 +33,7 @@ def test_start_vote_posts_vote_message_and_starts_comment_thread(
     start_thread_from_message_calls: list[StartThreadFromMessageCall] = []
     vote_message_id = MessageId("123456")
     vote_channel_id = ChannelId("2394893274")
-    today = date(2026, 11, 13)
+    today = date(2026, 11, 16)
 
     def fake_post_message(
         _token: str, channel_id: ChannelId, body: MessageCreateRequest
@@ -66,6 +66,4 @@ def test_start_vote_posts_vote_message_and_starts_comment_thread(
     start_thread_from_message_call = start_thread_from_message_calls[0]
     assert start_thread_from_message_call["channel_id"] == vote_channel_id
     assert start_thread_from_message_call["message_id"] == vote_message_id
-    assert start_thread_from_message_call["name"] == format_comment_thread_name(
-        candidate_days
-    )
+    assert start_thread_from_message_call["name"] == "11/30-12/6 💬コメント"

@@ -1,7 +1,8 @@
+from collections.abc import Sequence
 from datetime import date
 from typing import TypedDict
 
-from discord_api import AllowedMentions, PollAnswer, PollCreateRequest
+from discord_api import AllowedMentions, Message, PollAnswer, PollCreateRequest, UserId
 from schedule import format_date_range, format_date_with_weekday
 
 NO_AVAILABLE_DAY_TEXT = "どの日も難しい"
@@ -48,3 +49,13 @@ def build_vote_message(candidate_days: list[date]) -> VoteMessage:
 def format_comment_thread_name(candidate_days: list[date]) -> str:
     date_range = format_date_range(candidate_days[0], candidate_days[-1])
     return f"{date_range} {COMMENT_THREAD_NAME_SUFFIX}"
+
+
+def find_latest_vote_message(
+    messages: Sequence[Message], bot_id: UserId
+) -> Message | None:
+    def is_vote_message(message: Message) -> bool:
+        return "poll" in message and message["author"]["id"] == bot_id
+
+    vote_messages = [message for message in messages if is_vote_message(message)]
+    return max(vote_messages, key=lambda message: int(message["id"]), default=None)

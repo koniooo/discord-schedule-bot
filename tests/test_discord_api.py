@@ -19,6 +19,23 @@ from discord_api import (
 )
 
 
+class FakeUrlopen:
+    def __init__(self) -> None:
+        self.requests: list[Request] = []
+        self.response = b"{}"
+
+    def __call__(self, request: Request) -> BytesIO:
+        self.requests.append(request)
+        return BytesIO(self.response)
+
+
+@pytest.fixture
+def fake_urlopen(monkeypatch: pytest.MonkeyPatch) -> FakeUrlopen:
+    fake = FakeUrlopen()
+    monkeypatch.setattr(discord_api, "urlopen", fake)
+    return fake
+
+
 def test_build_request_sets_full_url() -> None:
     assert (
         build_request("GET", "/users/@me", "dummy-token").full_url
@@ -84,55 +101,35 @@ def test_build_request_rejects_post_without_body() -> None:
         build_request("POST", "/x", "dummy-token")  # pyright: ignore[reportArgumentType]
 
 
-def test_get_current_user_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[Request] = []
-
-    def fake_urlopen(request: Request) -> BytesIO:
-        calls.append(request)
-        return BytesIO(b'{"id": "4000", "username": "sample-bot"}')
-
-    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
+def test_get_current_user_builds_request(fake_urlopen: FakeUrlopen) -> None:
     get_current_user("dummy-token")
 
-    assert len(calls) == 1
-    request = calls[0]
+    assert len(fake_urlopen.requests) == 1
+    request = fake_urlopen.requests[0]
     assert request.method == "GET"
     assert request.full_url == "https://discord.com/api/v10/users/@me"
     assert request.get_header("Authorization") == "Bot dummy-token"
 
 
-def test_get_current_user_returns_user(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fake_urlopen(_request: Request) -> BytesIO:
-        return BytesIO(b'{"id": "4000", "username": "sample-bot"}')
-
-    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
+def test_get_current_user_returns_user(fake_urlopen: FakeUrlopen) -> None:
+    fake_urlopen.response = b'{"id": "4000", "username": "sample-bot"}'
 
     assert get_current_user("dummy-token") == {"id": "4000", "username": "sample-bot"}
 
 
-def test_post_message_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[Request] = []
-
-    def fake_urlopen(request: Request) -> BytesIO:
-        calls.append(request)
-        return BytesIO(b'{"id": "3000", "content": "hello"}')
-
-    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
+def test_post_message_builds_request(fake_urlopen: FakeUrlopen) -> None:
     post_message("dummy-token", ChannelId("2000"), body={"content": "hello"})
 
-    assert len(calls) == 1
-    request = calls[0]
+    assert len(fake_urlopen.requests) == 1
+    request = fake_urlopen.requests[0]
     assert request.method == "POST"
     assert request.full_url == "https://discord.com/api/v10/channels/2000/messages"
     assert request.get_header("Authorization") == "Bot dummy-token"
     assert request.data == b'{"content": "hello"}'
 
 
-def test_post_message_returns_created_message(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fake_urlopen(_request: Request) -> BytesIO:
-        return BytesIO(b'{"id": "3000", "content": "hello"}')
-
-    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
+def test_post_message_returns_created_message(fake_urlopen: FakeUrlopen) -> None:
+    fake_urlopen.response = b'{"id": "3000", "content": "hello"}'
 
     assert post_message("dummy-token", ChannelId("2000"), {"content": "hello"}) == {
         "id": "3000",
@@ -140,22 +137,13 @@ def test_post_message_returns_created_message(monkeypatch: pytest.MonkeyPatch) -
     }
 
 
-def test_start_thread_from_message_builds_request(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    calls: list[Request] = []
-
-    def fake_urlopen(request: Request) -> BytesIO:
-        calls.append(request)
-        return BytesIO(b'{"id": "3000", "name": "thread_name"}')
-
-    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
+def test_start_thread_from_message_builds_request(fake_urlopen: FakeUrlopen) -> None:
     start_thread_from_message(
         "dummy-token", ChannelId("2000"), MessageId("3000"), "thread_name"
     )
 
-    assert len(calls) == 1
-    request = calls[0]
+    assert len(fake_urlopen.requests) == 1
+    request = fake_urlopen.requests[0]
     assert request.method == "POST"
     assert (
         request.full_url
@@ -166,31 +154,20 @@ def test_start_thread_from_message_builds_request(
 
 
 def test_start_thread_from_message_returns_created_thread(
-    monkeypatch: pytest.MonkeyPatch,
+    fake_urlopen: FakeUrlopen,
 ) -> None:
-    def fake_urlopen(_request: Request) -> BytesIO:
-        return BytesIO(b'{"id": "2001", "name": "name_from_response"}')
-
-    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
+    fake_urlopen.response = b'{"id": "2001", "name": "name_from_response"}'
 
     assert start_thread_from_message(
         "dummy-token", ChannelId("2000"), MessageId("3000"), "thread_name"
     ) == {"id": "2001", "name": "name_from_response"}
 
 
-def test_add_reaction_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[Request] = []
-
-    def fake_urlopen(request: Request) -> BytesIO:
-        calls.append(request)
-        return BytesIO(b"")
-
-    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
-
+def test_add_reaction_builds_request(fake_urlopen: FakeUrlopen) -> None:
     add_reaction("dummy-token", ChannelId("2000"), MessageId("3000"), "👍🏻")
 
-    assert len(calls) == 1
-    request = calls[0]
+    assert len(fake_urlopen.requests) == 1
+    request = fake_urlopen.requests[0]
     assert request.method == "PUT"
     assert (
         request.full_url
@@ -199,19 +176,11 @@ def test_add_reaction_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:
     assert request.get_header("Authorization") == "Bot dummy-token"
 
 
-def test_list_guild_members_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[Request] = []
-
-    def fake_urlopen(request: Request) -> BytesIO:
-        calls.append(request)
-        return BytesIO(b"[]")
-
-    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
-
+def test_list_guild_members_builds_request(fake_urlopen: FakeUrlopen) -> None:
     list_guild_members("dummy-token", GuildId("1001"))
 
-    assert len(calls) == 1
-    request = calls[0]
+    assert len(fake_urlopen.requests) == 1
+    request = fake_urlopen.requests[0]
     assert request.method == "GET"
     assert (
         request.full_url == "https://discord.com/api/v10/guilds/1001/members?limit=1000"
@@ -219,13 +188,10 @@ def test_list_guild_members_builds_request(monkeypatch: pytest.MonkeyPatch) -> N
     assert request.get_header("Authorization") == "Bot dummy-token"
 
 
-def test_list_guild_members_returns_members(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fake_urlopen(_request: Request) -> BytesIO:
-        return BytesIO(
-            b'[{"user": {"id": "4000", "bot": true}}, {"user": {"id": "4001"}}]'
-        )
-
-    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
+def test_list_guild_members_returns_members(fake_urlopen: FakeUrlopen) -> None:
+    fake_urlopen.response = (
+        b'[{"user": {"id": "4000", "bot": true}}, {"user": {"id": "4001"}}]'
+    )
 
     members = list_guild_members("dummy-token", GuildId("1001"))
     assert members == [
@@ -234,19 +200,11 @@ def test_list_guild_members_returns_members(monkeypatch: pytest.MonkeyPatch) -> 
     ]
 
 
-def test_get_channel_messages_builds_request(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[Request] = []
-
-    def fake_urlopen(request: Request) -> BytesIO:
-        calls.append(request)
-        return BytesIO(b"[]")
-
-    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
-
+def test_get_channel_messages_builds_request(fake_urlopen: FakeUrlopen) -> None:
     get_channel_messages("dummy-token", ChannelId("2000"))
 
-    assert len(calls) == 1
-    request = calls[0]
+    assert len(fake_urlopen.requests) == 1
+    request = fake_urlopen.requests[0]
     assert request.method == "GET"
     assert (
         request.full_url
@@ -255,17 +213,14 @@ def test_get_channel_messages_builds_request(monkeypatch: pytest.MonkeyPatch) ->
     assert request.get_header("Authorization") == "Bot dummy-token"
 
 
-def test_get_channel_messages_returns_messages(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fake_urlopen(_request: Request) -> BytesIO:
-        return BytesIO(
-            '[{"id": "3002", "author": {"id": "4000", "bot": true}, '
-            '"poll": {"answers": ['
-            '{"answer_id": 1, "poll_media": {"text": "11/23 (月)"}}, '
-            '{"answer_id": 2, "poll_media": {"text": "どの日も難しい"}}]}}, '
-            '{"id": "3001", "author": {"id": "4001"}}]'.encode()
-        )
-
-    monkeypatch.setattr(discord_api, "urlopen", fake_urlopen)
+def test_get_channel_messages_returns_messages(fake_urlopen: FakeUrlopen) -> None:
+    fake_urlopen.response = (
+        '[{"id": "3002", "author": {"id": "4000", "bot": true}, '
+        '"poll": {"answers": ['
+        '{"answer_id": 1, "poll_media": {"text": "11/23 (月)"}}, '
+        '{"answer_id": 2, "poll_media": {"text": "どの日も難しい"}}]}}, '
+        '{"id": "3001", "author": {"id": "4001"}}]'.encode()
+    )
 
     assert get_channel_messages("dummy-token", ChannelId("2000")) == [
         {

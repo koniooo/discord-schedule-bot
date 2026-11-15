@@ -31,8 +31,8 @@ def test_start_vote_posts_vote_message_and_starts_comment_thread(
 
     post_message_calls: list[PostMessageCall] = []
     start_thread_from_message_calls: list[StartThreadFromMessageCall] = []
-    vote_message_id = MessageId("123456")
-    vote_channel_id = ChannelId("2394893274")
+    vote_message_id = MessageId("3000")
+    vote_channel_id = ChannelId("2000")
     today = date(2026, 11, 16)
 
     def fake_post_message(

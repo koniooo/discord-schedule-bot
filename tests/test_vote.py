@@ -9,6 +9,9 @@ from vote import (
     format_comment_thread_name,
 )
 
+BOT_ID = UserId("4000")
+OTHER_USER_ID = UserId("4001")
+
 
 def test_build_poll_answers_returns_day_answers_followed_by_no_available_day() -> None:
     assert build_poll_answers([date(2026, 11, 23), date(2026, 11, 24)]) == [
@@ -46,10 +49,6 @@ def test_format_comment_thread_name_shows_date_range_and_suffix() -> None:
     )
 
 
-BOT_ID = UserId("100")
-OTHER_USER_ID = UserId("200")
-
-
 def make_message(message_id: str, author_id: UserId, *, has_poll: bool) -> Message:
     message: Message = {
         "id": MessageId(message_id),
@@ -66,54 +65,54 @@ def make_message(message_id: str, author_id: UserId, *, has_poll: bool) -> Messa
 
 
 def test_find_latest_vote_message_returns_vote_message_in_typical_channel() -> None:
-    vote_message = make_message("1002", BOT_ID, has_poll=True)
+    vote_message = make_message("3002", BOT_ID, has_poll=True)
     messages = [
-        make_message("1003", OTHER_USER_ID, has_poll=False),
+        make_message("3003", OTHER_USER_ID, has_poll=False),
         vote_message,
-        make_message("1001", BOT_ID, has_poll=True),
+        make_message("3001", BOT_ID, has_poll=True),
     ]
 
     assert find_latest_vote_message(messages, BOT_ID) == vote_message
 
 
 def test_find_latest_vote_message_ignores_bot_message_without_poll() -> None:
-    vote_message = make_message("1002", BOT_ID, has_poll=True)
+    vote_message = make_message("3002", BOT_ID, has_poll=True)
     messages = [
-        make_message("1003", BOT_ID, has_poll=False),
+        make_message("3003", BOT_ID, has_poll=False),
         vote_message,
-        make_message("1001", BOT_ID, has_poll=True),
+        make_message("3001", BOT_ID, has_poll=True),
     ]
 
     assert find_latest_vote_message(messages, BOT_ID) == vote_message
 
 
 def test_find_latest_vote_message_ignores_poll_posted_by_other_user() -> None:
-    vote_message = make_message("1002", BOT_ID, has_poll=True)
+    vote_message = make_message("3002", BOT_ID, has_poll=True)
     messages = [
-        make_message("1003", OTHER_USER_ID, has_poll=True),
+        make_message("3003", OTHER_USER_ID, has_poll=True),
         vote_message,
-        make_message("1001", BOT_ID, has_poll=True),
+        make_message("3001", BOT_ID, has_poll=True),
     ]
 
     assert find_latest_vote_message(messages, BOT_ID) == vote_message
 
 
 def test_find_latest_vote_message_ignores_order() -> None:
-    vote_message = make_message("1003", BOT_ID, has_poll=True)
+    vote_message = make_message("3003", BOT_ID, has_poll=True)
     messages = [
-        make_message("1002", BOT_ID, has_poll=True),
+        make_message("3002", BOT_ID, has_poll=True),
         vote_message,
-        make_message("1001", BOT_ID, has_poll=True),
+        make_message("3001", BOT_ID, has_poll=True),
     ]
 
     assert find_latest_vote_message(messages, BOT_ID) == vote_message
 
 
 def test_find_latest_vote_message_compares_message_ids_as_numbers() -> None:
-    vote_message = make_message("1000", BOT_ID, has_poll=True)
+    vote_message = make_message("30000", BOT_ID, has_poll=True)
     messages = [
         vote_message,
-        make_message("999", BOT_ID, has_poll=True),
+        make_message("3999", BOT_ID, has_poll=True),
     ]
 
     assert find_latest_vote_message(messages, BOT_ID) == vote_message
@@ -121,9 +120,9 @@ def test_find_latest_vote_message_compares_message_ids_as_numbers() -> None:
 
 def test_find_latest_vote_message_returns_none_without_vote_message() -> None:
     messages = [
-        make_message("1003", BOT_ID, has_poll=False),
-        make_message("1002", OTHER_USER_ID, has_poll=True),
-        make_message("1001", BOT_ID, has_poll=False),
+        make_message("3003", BOT_ID, has_poll=False),
+        make_message("3002", OTHER_USER_ID, has_poll=True),
+        make_message("3001", BOT_ID, has_poll=False),
     ]
 
     assert find_latest_vote_message(messages, BOT_ID) is None

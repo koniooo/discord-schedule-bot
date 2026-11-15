@@ -1,10 +1,13 @@
 from datetime import date
 
-from discord_api import AnswerId, Message, MessageId, UserId
+import pytest
+
+from discord_api import AnswerId, Message, MessageId, User, UserId
 from vote import (
     VOTE_ANNOUNCEMENT_TEXT,
     build_poll_answers,
     build_vote_message,
+    collect_voter_ids,
     find_latest_vote_message,
     format_comment_thread_name,
 )
@@ -126,3 +129,32 @@ def test_find_latest_vote_message_returns_none_without_vote_message() -> None:
     ]
 
     assert find_latest_vote_message(messages, BOT_ID) is None
+
+
+@pytest.mark.parametrize(
+    ("voters_per_answer", "expected"),
+    [
+        pytest.param(
+            [
+                [{"id": "4001"}],
+                [],
+                [{"id": "4002"}],
+            ],
+            {"4001", "4002"},
+            id="users_in_different_answers",
+        ),
+        pytest.param(
+            [
+                [{"id": "4001"}, {"id": "4002"}],
+                [{"id": "4002"}],
+            ],
+            {"4001", "4002"},
+            id="same_user_in_multiple_answers",
+        ),
+        pytest.param([list[User](), list[User]()], set[UserId](), id="no_voters"),
+    ],
+)
+def test_collect_voter_ids_returns_ids_of_all_voters(
+    voters_per_answer: list[list[User]], expected: set[UserId]
+) -> None:
+    assert collect_voter_ids(voters_per_answer) == expected

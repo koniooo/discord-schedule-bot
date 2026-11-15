@@ -2,7 +2,14 @@ from collections.abc import Sequence
 from datetime import date
 from typing import TypedDict
 
-from discord_api import AllowedMentions, Message, PollAnswer, PollCreateRequest, UserId
+from discord_api import (
+    AllowedMentions,
+    Message,
+    PollAnswer,
+    PollCreateRequest,
+    User,
+    UserId,
+)
 from schedule import format_date_range, format_date_with_weekday
 
 NO_AVAILABLE_DAY_TEXT = "どの日も難しい"
@@ -59,3 +66,11 @@ def find_latest_vote_message(
 
     vote_messages = [message for message in messages if is_vote_message(message)]
     return max(vote_messages, key=lambda message: int(message["id"]), default=None)
+
+
+def collect_voter_ids(voters_per_answer: list[list[User]]) -> set[UserId]:
+    voter_ids: set[UserId] = set()
+    for voters in voters_per_answer:
+        for voter in voters:
+            voter_ids.add(voter["id"])
+    return voter_ids

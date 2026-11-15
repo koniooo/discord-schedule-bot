@@ -161,3 +161,16 @@ def get_channel_messages(token: str, channel_id: ChannelId) -> list[Message]:
     request = build_request("GET", f"/channels/{channel_id}/messages?limit=100", token)
     with urlopen(request) as response:
         return json.load(response)
+
+
+def get_answer_voters(
+    token: str, channel_id: ChannelId, message_id: MessageId, answer_id: AnswerId
+) -> list[User]:
+    """GET https://discord.com/api/v10/channels/{channel_id}/polls/{message_id}/answers/{answer_id}?limit=100"""
+    request = build_request(
+        "GET",
+        f"/channels/{channel_id}/polls/{message_id}/answers/{answer_id}?limit=100",
+        token,
+    )
+    with urlopen(request) as response:
+        return json.load(response)["users"]

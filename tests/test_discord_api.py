@@ -6,11 +6,13 @@ import pytest
 
 import discord_api
 from discord_api import (
+    AnswerId,
     ChannelId,
     GuildId,
     MessageId,
     add_reaction,
     build_request,
+    get_answer_voters,
     get_channel_messages,
     get_current_user,
     list_guild_members,
@@ -235,3 +237,27 @@ def test_get_channel_messages_returns_messages(fake_urlopen: FakeUrlopen) -> Non
         },
         {"id": "3001", "author": {"id": "4001"}},
     ]
+
+
+def test_get_answer_voters_builds_request(fake_urlopen: FakeUrlopen) -> None:
+    # get_answer_voters reads the "users" key, so the default "{}" is not enough.
+    fake_urlopen.response = b'{"users": []}'
+
+    get_answer_voters("dummy-token", ChannelId("2000"), MessageId("3000"), AnswerId(1))
+
+    assert len(fake_urlopen.requests) == 1
+    request = fake_urlopen.requests[0]
+    assert request.method == "GET"
+    assert (
+        request.full_url
+        == "https://discord.com/api/v10/channels/2000/polls/3000/answers/1?limit=100"
+    )
+    assert request.get_header("Authorization") == "Bot dummy-token"
+
+
+def test_get_answer_voters_returns_voters(fake_urlopen: FakeUrlopen) -> None:
+    fake_urlopen.response = b'{"users": [{"id": "4001"}, {"id": "4002"}]}'
+
+    assert get_answer_voters(
+        "dummy-token", ChannelId("2000"), MessageId("3000"), AnswerId(1)
+    ) == [{"id": "4001"}, {"id": "4002"}]

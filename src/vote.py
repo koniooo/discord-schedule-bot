@@ -5,6 +5,7 @@ from typing import TypedDict
 from discord_api import (
     AllowedMentions,
     AutoArchiveDuration,
+    GuildMember,
     Message,
     PollAnswer,
     PollCreateRequest,
@@ -77,3 +78,16 @@ def collect_voter_ids(voters_per_answer: list[list[User]]) -> set[UserId]:
         for voter in voters:
             voter_ids.add(voter["id"])
     return voter_ids
+
+
+def collect_non_voter_ids(
+    guild_members: list[GuildMember], voter_ids: set[UserId]
+) -> list[UserId]:
+    """Return the ids of human members who have not voted, in member order."""
+
+    def is_human_non_voter(user: User) -> bool:
+        return not user.get("bot") and user["id"] not in voter_ids
+
+    users = [guild_member["user"] for guild_member in guild_members]
+
+    return [user["id"] for user in users if is_human_non_voter(user)]

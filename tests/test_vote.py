@@ -2,11 +2,12 @@ from datetime import date
 
 import pytest
 
-from discord_api import AnswerId, Message, MessageId, User, UserId
+from discord_api import AnswerId, GuildMember, Message, MessageId, User, UserId
 from vote import (
     VOTE_ANNOUNCEMENT_TEXT,
     build_poll_answers,
     build_vote_message,
+    collect_non_voter_ids,
     collect_voter_ids,
     find_latest_vote_message,
     format_comment_thread_name,
@@ -158,3 +159,47 @@ def test_collect_voter_ids_returns_ids_of_all_voters(
     voters_per_answer: list[list[User]], expected: set[UserId]
 ) -> None:
     assert collect_voter_ids(voters_per_answer) == expected
+
+
+@pytest.mark.parametrize(
+    ("members", "voter_ids", "expected"),
+    [
+        pytest.param(
+            [
+                {"user": {"id": "4000", "bot": True}},
+                {"user": {"id": "4001"}},
+                {"user": {"id": "4002"}},
+                {"user": {"id": "4003"}},
+            ],
+            {"4002"},
+            ["4001", "4003"],
+            id="ignores_bot",
+        ),
+        pytest.param(
+            [
+                {"user": {"id": "4000", "bot": True}},
+                {"user": {"id": "4001"}},
+                {"user": {"id": "4002"}},
+                {"user": {"id": "4003"}},
+            ],
+            {"4001", "4002", "4003"},
+            [],
+            id="every_member_voted",
+        ),
+        pytest.param(
+            [
+                {"user": {"id": "4003"}},
+                {"user": {"id": "4000", "bot": True}},
+                {"user": {"id": "4001"}},
+                {"user": {"id": "4002"}},
+            ],
+            {"4002"},
+            ["4003", "4001"],
+            id="keeps_member_order",
+        ),
+    ],
+)
+def test_collect_non_voter_ids_returns_ids_of_human_non_voters(
+    members: list[GuildMember], voter_ids: set[UserId], expected: list[UserId]
+) -> None:
+    assert collect_non_voter_ids(members, voter_ids) == expected

@@ -5,6 +5,7 @@ import pytest
 
 import jobs
 from discord_api import (
+    AutoArchiveDuration,
     Channel,
     ChannelId,
     Message,
@@ -28,6 +29,7 @@ def test_start_vote_posts_vote_message_and_starts_comment_thread(
         channel_id: ChannelId
         message_id: MessageId
         name: str
+        auto_archive_duration: AutoArchiveDuration
 
     post_message_calls: list[PostMessageCall] = []
     start_thread_from_message_calls: list[StartThreadFromMessageCall] = []
@@ -42,10 +44,19 @@ def test_start_vote_posts_vote_message_and_starts_comment_thread(
         return {"id": vote_message_id, "author": {"id": UserId("")}}
 
     def fake_start_thread_from_message(
-        _token: str, channel_id: ChannelId, message_id: MessageId, name: str
+        _token: str,
+        channel_id: ChannelId,
+        message_id: MessageId,
+        name: str,
+        auto_archive_duration: AutoArchiveDuration,
     ) -> Channel:
         start_thread_from_message_calls.append(
-            {"channel_id": channel_id, "message_id": message_id, "name": name}
+            {
+                "channel_id": channel_id,
+                "message_id": message_id,
+                "name": name,
+                "auto_archive_duration": auto_archive_duration,
+            }
         )
         return {"id": ChannelId("")}
 
@@ -67,3 +78,4 @@ def test_start_vote_posts_vote_message_and_starts_comment_thread(
     assert start_thread_from_message_call["channel_id"] == vote_channel_id
     assert start_thread_from_message_call["message_id"] == vote_message_id
     assert start_thread_from_message_call["name"] == "11/30-12/6 💬コメント"
+    assert start_thread_from_message_call["auto_archive_duration"] == 10080

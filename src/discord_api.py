@@ -67,6 +67,10 @@ class MessageCreateRequest(TypedDict):
     poll: ReadOnly[NotRequired[PollCreateRequest]]
 
 
+# Minutes of inactivity before Discord archives a thread: 1 hour, 1 day, 3 days, 7 days.
+type AutoArchiveDuration = Literal[60, 1440, 4320, 10080]
+
+
 class GuildMember(TypedDict):
     user: User
 
@@ -121,10 +125,14 @@ def post_message(
 
 
 def start_thread_from_message(
-    token: str, channel_id: ChannelId, message_id: MessageId, name: str
+    token: str,
+    channel_id: ChannelId,
+    message_id: MessageId,
+    name: str,
+    auto_archive_duration: AutoArchiveDuration,
 ) -> Channel:
     """POST https://discord.com/api/v10/channels/{channel_id}/messages/{message_id}/threads"""
-    body = {"name": name, "auto_archive_duration": 60 * 24 * 7}
+    body = {"name": name, "auto_archive_duration": auto_archive_duration}
     request = build_request(
         "POST",
         f"/channels/{channel_id}/messages/{message_id}/threads",

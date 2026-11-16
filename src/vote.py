@@ -4,6 +4,7 @@ from typing import TypedDict
 
 from discord_api import (
     AllowedMentions,
+    AutoArchiveDuration,
     Message,
     PollAnswer,
     PollCreateRequest,
@@ -24,6 +25,8 @@ POLL_QUESTION_TEXT = "参加可能日 (22:00～23:30)"
 VOTE_DURATION_HOURS = 24 * 7
 
 COMMENT_THREAD_NAME_SUFFIX = "💬コメント"
+
+COMMENT_THREAD_AUTO_ARCHIVE_MINUTES: AutoArchiveDuration = 60 * 24 * 7
 
 
 class VoteMessage(TypedDict):

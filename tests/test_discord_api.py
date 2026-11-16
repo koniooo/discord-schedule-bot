@@ -141,7 +141,7 @@ def test_post_message_returns_created_message(fake_urlopen: FakeUrlopen) -> None
 
 def test_start_thread_from_message_builds_request(fake_urlopen: FakeUrlopen) -> None:
     start_thread_from_message(
-        "dummy-token", ChannelId("2000"), MessageId("3000"), "thread_name"
+        "dummy-token", ChannelId("2000"), MessageId("3000"), "thread_name", 1440
     )
 
     assert len(fake_urlopen.requests) == 1
@@ -152,7 +152,7 @@ def test_start_thread_from_message_builds_request(fake_urlopen: FakeUrlopen) -> 
         == "https://discord.com/api/v10/channels/2000/messages/3000/threads"
     )
     assert request.get_header("Authorization") == "Bot dummy-token"
-    assert request.data == b'{"name": "thread_name", "auto_archive_duration": 10080}'
+    assert request.data == b'{"name": "thread_name", "auto_archive_duration": 1440}'
 
 
 def test_start_thread_from_message_returns_created_thread(
@@ -161,7 +161,7 @@ def test_start_thread_from_message_returns_created_thread(
     fake_urlopen.response = b'{"id": "2001", "name": "name_from_response"}'
 
     assert start_thread_from_message(
-        "dummy-token", ChannelId("2000"), MessageId("3000"), "thread_name"
+        "dummy-token", ChannelId("2000"), MessageId("3000"), "thread_name", 1440
     ) == {"id": "2001", "name": "name_from_response"}
 
 

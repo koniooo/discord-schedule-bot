@@ -39,7 +39,7 @@ def test_build_vote_message_builds_poll_from_candidate_days() -> None:
     assert build_vote_message(candidate_days)["poll"] == {
         "question": {"text": "参加可能日 (22:00～23:30)"},
         "answers": build_poll_answers(candidate_days),
-        "duration": 168,
+        "duration": 72,
         "allow_multiselect": True,
     }
 

@@ -48,10 +48,20 @@ class PollResponse(TypedDict):
     answers: list[PollAnswerResponse]
 
 
+class Emoji(TypedDict):
+    name: str | None
+
+
+class Reaction(TypedDict):
+    me: bool
+    emoji: Emoji
+
+
 class Message(TypedDict):
     id: MessageId
     author: User
     poll: NotRequired[PollResponse]
+    reactions: NotRequired[list[Reaction]]
 
 
 type AllowedMentionType = Literal["roles", "users", "everyone"]

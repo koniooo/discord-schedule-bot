@@ -29,6 +29,8 @@ COMMENT_THREAD_NAME_SUFFIX = "💬コメント"
 
 COMMENT_THREAD_AUTO_ARCHIVE_MINUTES: AutoArchiveDuration = 60 * 24 * 7
 
+ALL_VOTED_REPORTED_EMOJI = "✅"
+
 
 class VoteMessage(TypedDict):
     content: str
@@ -91,3 +93,12 @@ def collect_non_voter_ids(
     users = [guild_member["user"] for guild_member in guild_members]
 
     return [user["id"] for user in users if is_human_non_voter(user)]
+
+
+def has_own_reaction(message: Message, emoji: str) -> bool:
+    if "reactions" not in message:
+        return False
+    return any(
+        reaction["me"] and reaction["emoji"]["name"] == emoji
+        for reaction in message["reactions"]
+    )

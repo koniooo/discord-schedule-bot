@@ -2,7 +2,15 @@ from datetime import date
 
 import pytest
 
-from discord_api import AnswerId, GuildMember, Message, MessageId, User, UserId
+from discord_api import (
+    AnswerId,
+    GuildMember,
+    Message,
+    MessageId,
+    Reaction,
+    User,
+    UserId,
+)
 from vote import (
     VOTE_ANNOUNCEMENT_TEXT,
     build_poll_answers,
@@ -11,6 +19,7 @@ from vote import (
     collect_voter_ids,
     find_latest_vote_message,
     format_comment_thread_name,
+    has_own_reaction,
 )
 
 BOT_ID = UserId("4000")
@@ -203,3 +212,43 @@ def test_collect_non_voter_ids_returns_ids_of_human_non_voters(
     members: list[GuildMember], voter_ids: set[UserId], expected: list[UserId]
 ) -> None:
     assert collect_non_voter_ids(members, voter_ids) == expected
+
+
+@pytest.mark.parametrize(
+    ("reactions", "expected"),
+    [
+        pytest.param(
+            [Reaction(me=True, emoji={"name": "✅"})], True, id="own_matching_emoji"
+        ),
+        pytest.param(
+            [Reaction(me=True, emoji={"name": "👍"})], False, id="own_other_emoji"
+        ),
+        pytest.param(
+            [Reaction(me=False, emoji={"name": "✅"})],
+            False,
+            id="others_matching_emoji",
+        ),
+        pytest.param(
+            [
+                Reaction(me=False, emoji={"name": "👍"}),
+                Reaction(me=True, emoji={"name": "✅"}),
+            ],
+            True,
+            id="own_matching_emoji_after_others",
+        ),
+    ],
+)
+def test_has_own_reaction_returns_whether_bot_reacted_with_emoji(
+    reactions: list[Reaction], expected: bool
+) -> None:
+    message = Message(
+        id=MessageId("3000"),
+        author={"id": BOT_ID},
+        reactions=reactions,
+    )
+    assert has_own_reaction(message, "✅") == expected
+
+
+def test_has_own_reaction_returns_false_without_reactions() -> None:
+    message = Message(id=MessageId("3000"), author={"id": BOT_ID})
+    assert has_own_reaction(message, "✅") is False

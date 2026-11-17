@@ -1,9 +1,11 @@
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pytest
 
 from discord_api import (
     AnswerId,
+    ChannelId,
+    GuildId,
     GuildMember,
     Message,
     MessageId,
@@ -13,6 +15,7 @@ from discord_api import (
 )
 from vote import (
     VOTE_ANNOUNCEMENT_TEXT,
+    build_all_voted_report_message,
     build_poll_answers,
     build_vote_message,
     collect_non_voter_ids,
@@ -252,3 +255,19 @@ def test_has_own_reaction_returns_whether_bot_reacted_with_emoji(
 def test_has_own_reaction_returns_false_without_reactions() -> None:
     message = Message(id=MessageId("3000"), author={"id": BOT_ID})
     assert has_own_reaction(message, "✅") is False
+
+
+def test_build_all_voted_report_message_shows_count_link_and_jst_deadline() -> None:
+    assert build_all_voted_report_message(
+        8,
+        GuildId("1001"),
+        ChannelId("3000"),
+        datetime(2026, 11, 24, 3, 0, tzinfo=UTC),
+    ) == {
+        "content": (
+            "8人全員が投票したクポ～\n"
+            "https://discord.com/channels/1001/3000\n"
+            "\n"
+            "ただ11/24 (火)の12時までは投票し直せるから気をつけてクポ～"
+        )
+    }

@@ -1,18 +1,21 @@
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, datetime
 from typing import TypedDict
 
 from discord_api import (
     AllowedMentions,
     AutoArchiveDuration,
+    ChannelId,
+    GuildId,
     GuildMember,
     Message,
+    MessageCreateRequest,
     PollAnswer,
     PollCreateRequest,
     User,
     UserId,
 )
-from schedule import format_date_range, format_date_with_weekday
+from schedule import JST, format_date_range, format_date_with_weekday
 
 NO_AVAILABLE_DAY_TEXT = "どの日も難しい"
 
@@ -102,3 +105,20 @@ def has_own_reaction(message: Message, emoji: str) -> bool:
         reaction["me"] and reaction["emoji"]["name"] == emoji
         for reaction in message["reactions"]
     )
+
+
+def build_all_voted_report_message(
+    human_member_count: int,
+    guild_id: GuildId,
+    thread_id: ChannelId,
+    poll_expires_at: datetime,
+) -> MessageCreateRequest:
+    expires_at_in_jst = poll_expires_at.astimezone(JST)
+    content = (
+        f"{human_member_count}人全員が投票したクポ～\n"
+        f"https://discord.com/channels/{guild_id}/{thread_id}\n"
+        "\n"
+        f"ただ{format_date_with_weekday(expires_at_in_jst.date())}の"
+        f"{expires_at_in_jst.hour}時までは投票し直せるから気をつけてクポ～"
+    )
+    return MessageCreateRequest(content=content)

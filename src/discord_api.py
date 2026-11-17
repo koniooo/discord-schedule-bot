@@ -137,7 +137,7 @@ def start_thread_from_message(
         "POST",
         f"/channels/{channel_id}/messages/{message_id}/threads",
         token,
-        body=body,
+        body,
     )
     with urlopen(request) as response:
         return json.load(response)
@@ -182,3 +182,11 @@ def get_answer_voters(
     )
     with urlopen(request) as response:
         return json.load(response)["users"]
+
+
+def create_dm_channel(token: str, recipient_id: UserId) -> Channel:
+    """POST https://discord.com/api/v10/users/@me/channels"""
+    body = {"recipient_id": recipient_id}
+    request = build_request("POST", "/users/@me/channels", token, body)
+    with urlopen(request) as response:
+        return json.load(response)

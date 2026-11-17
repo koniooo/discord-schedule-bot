@@ -10,8 +10,10 @@ from discord_api import (
     ChannelId,
     GuildId,
     MessageId,
+    UserId,
     add_reaction,
     build_request,
+    create_dm_channel,
     get_answer_voters,
     get_channel_messages,
     get_current_user,
@@ -261,3 +263,20 @@ def test_get_answer_voters_returns_voters(fake_urlopen: FakeUrlopen) -> None:
     assert get_answer_voters(
         "dummy-token", ChannelId("2000"), MessageId("3000"), AnswerId(1)
     ) == [{"id": "4001"}, {"id": "4002"}]
+
+
+def test_create_dm_channel_builds_request(fake_urlopen: FakeUrlopen) -> None:
+    create_dm_channel("dummy-token", UserId("4001"))
+
+    assert len(fake_urlopen.requests) == 1
+    request = fake_urlopen.requests[0]
+    assert request.method == "POST"
+    assert request.full_url == "https://discord.com/api/v10/users/@me/channels"
+    assert request.get_header("Authorization") == "Bot dummy-token"
+    assert request.data == b'{"recipient_id": "4001"}'
+
+
+def test_create_dm_channel_returns_dm_channel(fake_urlopen: FakeUrlopen) -> None:
+    fake_urlopen.response = b'{"id": "2000", "type": 1}'
+
+    assert create_dm_channel("dummy-token", UserId("4001")) == {"id": "2000", "type": 1}

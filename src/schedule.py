@@ -1,6 +1,9 @@
-"""Date helpers for vote candidates. Weeks start on Monday (ISO 8601)."""
+"""Date and time helpers for vote candidates. Weeks start on Monday (ISO 8601)."""
 
 from datetime import date, timedelta
+from zoneinfo import ZoneInfo
+
+JST = ZoneInfo("Asia/Tokyo")
 
 _WEEKDAY_NAMES = ("月", "火", "水", "木", "金", "土", "日")
 

@@ -46,6 +46,7 @@ class PollAnswerResponse(PollAnswer):
 
 class PollResponse(TypedDict):
     answers: list[PollAnswerResponse]
+    expiry: str | None
 
 
 class Emoji(TypedDict):

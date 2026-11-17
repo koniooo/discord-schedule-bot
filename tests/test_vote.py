@@ -9,6 +9,7 @@ from discord_api import (
     GuildMember,
     Message,
     MessageId,
+    PollResponse,
     Reaction,
     User,
     UserId,
@@ -22,6 +23,7 @@ from vote import (
     collect_voter_ids,
     find_latest_vote_message,
     format_comment_thread_name,
+    get_poll_expires_at,
     has_own_reaction,
 )
 
@@ -75,7 +77,8 @@ def make_message(message_id: str, author_id: UserId, *, has_poll: bool) -> Messa
             "answers": [
                 {"poll_media": {"text": "11/16 (月)"}, "answer_id": AnswerId(1)},
                 {"poll_media": {"text": "11/17 (火)"}, "answer_id": AnswerId(2)},
-            ]
+            ],
+            "expiry": "2026-11-18T03:00:00+00:00",
         }
     return message
 
@@ -271,3 +274,16 @@ def test_build_all_voted_report_message_shows_count_link_and_jst_deadline() -> N
             "ただ11/24 (火)の12時までは投票し直せるから気をつけてクポ～"
         )
     }
+
+
+def test_get_poll_expires_at_returns_expiry_as_aware_datetime() -> None:
+    poll = PollResponse(answers=[], expiry="2026-11-24T03:00:00.123000+00:00")
+    assert get_poll_expires_at(poll) == datetime(
+        2026, 11, 24, 3, 0, 0, 123000, tzinfo=UTC
+    )
+
+
+def test_get_poll_expires_at_raises_when_poll_has_no_expiry() -> None:
+    poll = PollResponse(answers=[], expiry=None)
+    with pytest.raises(ValueError, match="expiry"):
+        get_poll_expires_at(poll)

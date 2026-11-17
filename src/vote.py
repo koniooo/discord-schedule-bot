@@ -12,6 +12,7 @@ from discord_api import (
     MessageCreateRequest,
     PollAnswer,
     PollCreateRequest,
+    PollResponse,
     User,
     UserId,
 )
@@ -122,3 +123,10 @@ def build_all_voted_report_message(
         f"{expires_at_in_jst.hour}時までは投票し直せるから気をつけてクポ～"
     )
     return MessageCreateRequest(content=content)
+
+
+def get_poll_expires_at(poll: PollResponse) -> datetime:
+    expiry = poll["expiry"]
+    if expiry is None:
+        raise ValueError("Poll has no expiry")
+    return datetime.fromisoformat(expiry)

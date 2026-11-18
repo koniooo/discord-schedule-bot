@@ -1,3 +1,4 @@
+import json
 from io import BytesIO
 from typing import Literal
 from urllib.request import Request
@@ -9,6 +10,7 @@ from discord_api import (
     AnswerId,
     ChannelId,
     GuildId,
+    Message,
     MessageId,
     UserId,
     add_reaction,
@@ -218,27 +220,26 @@ def test_get_channel_messages_builds_request(fake_urlopen: FakeUrlopen) -> None:
 
 
 def test_get_channel_messages_returns_messages(fake_urlopen: FakeUrlopen) -> None:
-    fake_urlopen.response = (
-        '[{"id": "3002", "author": {"id": "4000", "bot": true}, '
-        '"poll": {"answers": ['
-        '{"answer_id": 1, "poll_media": {"text": "11/23 (月)"}}, '
-        '{"answer_id": 2, "poll_media": {"text": "どの日も難しい"}}]}}, '
-        '{"id": "3001", "author": {"id": "4001"}}]'.encode()
-    )
-
-    assert get_channel_messages("dummy-token", ChannelId("2000")) == [
+    messages: list[Message] = [
         {
-            "id": "3002",
-            "author": {"id": "4000", "bot": True},
+            "id": MessageId("3002"),
+            "author": {"id": UserId("4000"), "bot": True},
             "poll": {
                 "answers": [
-                    {"answer_id": 1, "poll_media": {"text": "11/23 (月)"}},
-                    {"answer_id": 2, "poll_media": {"text": "どの日も難しい"}},
-                ]
+                    {"answer_id": AnswerId(1), "poll_media": {"text": "11/23 (月)"}},
+                    {
+                        "answer_id": AnswerId(2),
+                        "poll_media": {"text": "どの日も難しい"},
+                    },
+                ],
+                "expiry": "2026-11-24T03:00:00+00:00",
             },
         },
-        {"id": "3001", "author": {"id": "4001"}},
+        {"id": MessageId("3001"), "author": {"id": UserId("4001")}},
     ]
+    fake_urlopen.response = json.dumps(messages).encode()
+
+    assert get_channel_messages("dummy-token", ChannelId("2000")) == messages
 
 
 def test_get_answer_voters_builds_request(fake_urlopen: FakeUrlopen) -> None:

@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import TypedDict
 
 from discord_api import (
@@ -17,6 +17,7 @@ from discord_api import (
     UserId,
 )
 from schedule import JST, format_date_range, format_date_with_weekday
+from vote_timing import VOTE_DURATION
 
 NO_AVAILABLE_DAY_TEXT = "どの日も難しい"
 
@@ -26,8 +27,6 @@ VOTE_ANNOUNCEMENT_TEXT = (
 )
 
 POLL_QUESTION_TEXT = "参加可能日 (22:00～23:30)"
-
-VOTE_DURATION_HOURS = 24 * 2
 
 COMMENT_THREAD_NAME_SUFFIX = "💬コメント"
 
@@ -57,7 +56,7 @@ def build_vote_message(candidate_days: list[date]) -> VoteMessage:
         "poll": {
             "question": {"text": POLL_QUESTION_TEXT},
             "answers": build_poll_answers(candidate_days),
-            "duration": VOTE_DURATION_HOURS,
+            "duration": VOTE_DURATION // timedelta(hours=1),
             "allow_multiselect": True,
         },
     }

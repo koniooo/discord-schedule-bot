@@ -19,6 +19,7 @@ from discord_api import (
     get_answer_voters,
     get_channel_messages,
     get_current_user,
+    get_thread_id_started_from,
     list_guild_members,
     post_message,
     start_thread_from_message,
@@ -47,6 +48,10 @@ def test_build_request_sets_full_url() -> None:
         build_request("GET", "/users/@me", "dummy-token").full_url
         == "https://discord.com/api/v10/users/@me"
     )
+
+
+def test_get_thread_id_started_from_returns_message_id() -> None:
+    assert get_thread_id_started_from(MessageId("3000")) == "3000"
 
 
 def test_build_request_sets_bot_authorization_header() -> None:

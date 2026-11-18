@@ -86,6 +86,11 @@ class GuildMember(TypedDict):
     user: User
 
 
+def get_thread_id_started_from(message_id: MessageId) -> ChannelId:
+    """A thread started from a message has the same id as the message."""
+    return ChannelId(message_id)
+
+
 @overload
 def build_request(
     method: Literal["GET", "PUT"], path: str, token: str, body: None = None

@@ -25,6 +25,10 @@ class Channel(TypedDict):
     id: ChannelId
 
 
+class Thread(TypedDict):
+    name: str
+
+
 class PollMedia(TypedDict):
     text: str
 
@@ -63,6 +67,7 @@ class Message(TypedDict):
     author: User
     poll: NotRequired[PollResponse]
     reactions: NotRequired[list[Reaction]]
+    thread: NotRequired[Thread]
 
 
 type AllowedMentionType = Literal["roles", "users", "everyone"]

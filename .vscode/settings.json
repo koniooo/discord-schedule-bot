@@ -8,6 +8,7 @@
     }
   },
   "cSpell.words": [
+    "caplog",
     "delenv",
     "dotenv",
     "pytest",

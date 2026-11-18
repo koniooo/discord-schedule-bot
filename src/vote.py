@@ -86,13 +86,17 @@ def collect_voter_ids(voters_per_answer: list[list[User]]) -> set[UserId]:
     return voter_ids
 
 
+def is_human(user: User) -> bool:
+    return not user.get("bot", False)
+
+
 def collect_non_voter_ids(
     guild_members: list[GuildMember], voter_ids: set[UserId]
 ) -> list[UserId]:
     """Return the ids of human members who have not voted, in member order."""
 
     def is_human_non_voter(user: User) -> bool:
-        return not user.get("bot") and user["id"] not in voter_ids
+        return is_human(user) and user["id"] not in voter_ids
 
     users = [guild_member["user"] for guild_member in guild_members]
 

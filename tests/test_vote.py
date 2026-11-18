@@ -25,6 +25,7 @@ from vote import (
     format_comment_thread_name,
     get_poll_expires_at,
     has_own_reaction,
+    is_human,
 )
 
 BOT_ID = UserId("4000")
@@ -287,3 +288,15 @@ def test_get_poll_expires_at_raises_when_poll_has_no_expiry() -> None:
     poll = PollResponse(answers=[], expiry=None)
     with pytest.raises(ValueError, match="expiry"):
         get_poll_expires_at(poll)
+
+
+@pytest.mark.parametrize(
+    ("user", "expected"),
+    [
+        pytest.param(User(id=UserId("4001")), True, id="bot_key_missing"),
+        pytest.param(User(id=UserId("4001"), bot=False), True, id="bot_false"),
+        pytest.param(User(id=UserId("4000"), bot=True), False, id="bot_true"),
+    ],
+)
+def test_is_human_returns_whether_user_is_human(user: User, expected: bool) -> None:
+    assert is_human(user) == expected

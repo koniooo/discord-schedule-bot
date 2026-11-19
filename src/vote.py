@@ -8,6 +8,7 @@ from discord_api import (
     GuildMember,
     Message,
     MessageCreateRequest,
+    MessageId,
     PollAnswer,
     PollResponse,
     User,
@@ -101,6 +102,13 @@ def has_own_reaction(message: Message, emoji: str) -> bool:
     )
 
 
+def get_poll_expires_at(poll: PollResponse) -> datetime:
+    expiry = poll["expiry"]
+    if expiry is None:
+        raise ValueError("Poll has no expiry")
+    return datetime.fromisoformat(expiry)
+
+
 def build_all_voted_report_message(
     human_member_count: int,
     guild_id: GuildId,
@@ -118,8 +126,35 @@ def build_all_voted_report_message(
     return MessageCreateRequest(content=content)
 
 
-def get_poll_expires_at(poll: PollResponse) -> datetime:
-    expiry = poll["expiry"]
-    if expiry is None:
-        raise ValueError("Poll has no expiry")
-    return datetime.fromisoformat(expiry)
+def _format_reminder_text(poll_expires_at: datetime) -> str:
+    expires_at_in_jst = poll_expires_at.astimezone(JST)
+    return (
+        f"{format_date_with_weekday(expires_at_in_jst.date())}の"
+        f"{expires_at_in_jst.hour}時に投票を締め切るクポ～"
+        "\n"
+        "それまでにご投票お願いしますクポ。"
+    )
+
+
+def build_dm_reminder_message(
+    guild_id: GuildId,
+    channel_id: ChannelId,
+    vote_message_id: MessageId,
+    poll_expires_at: datetime,
+) -> MessageCreateRequest:
+    content = (
+        f"{_format_reminder_text(poll_expires_at)}"
+        "\n"
+        f"https://discord.com/channels/{guild_id}/{channel_id}/{vote_message_id}"
+    )
+    return MessageCreateRequest(content=content)
+
+
+def build_vote_channel_reminder_message(
+    vote_message_id: MessageId, poll_expires_at: datetime
+) -> MessageCreateRequest:
+    content = _format_reminder_text(poll_expires_at)
+    return MessageCreateRequest(
+        content=content,
+        message_reference={"message_id": vote_message_id},
+    )

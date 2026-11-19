@@ -70,8 +70,13 @@ class Message(TypedDict):
     thread: NotRequired[Thread]
 
 
+class MessageReference(TypedDict):
+    message_id: MessageId
+
+
 class MessageCreateRequest(TypedDict):
     content: ReadOnly[str]
+    message_reference: ReadOnly[NotRequired[MessageReference]]
     poll: ReadOnly[NotRequired[PollCreateRequest]]
 
 

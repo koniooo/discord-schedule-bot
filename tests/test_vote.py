@@ -17,7 +17,9 @@ from discord_api import (
 from vote import (
     VOTE_ANNOUNCEMENT_TEXT,
     build_all_voted_report_message,
+    build_dm_reminder_message,
     build_poll_answers,
+    build_vote_channel_reminder_message,
     build_vote_message,
     collect_non_voter_ids,
     collect_voter_ids,
@@ -299,3 +301,30 @@ def test_get_poll_expires_at_raises_when_poll_has_no_expiry() -> None:
 )
 def test_is_human_returns_whether_user_is_human(user: User, expected: bool) -> None:
     assert is_human(user) == expected
+
+
+def test_build_dm_reminder_message_shows_jst_deadline_and_vote_link() -> None:
+    assert build_dm_reminder_message(
+        GuildId("1001"),
+        ChannelId("2000"),
+        MessageId("3000"),
+        datetime(2026, 11, 24, 3, 0, tzinfo=UTC),
+    ) == {
+        "content": (
+            "11/24 (火)の12時に投票を締め切るクポ～\n"
+            "それまでにご投票お願いしますクポ。\n"
+            "https://discord.com/channels/1001/2000/3000"
+        )
+    }
+
+
+def test_build_vote_channel_reminder_message_replies_to_vote_message() -> None:
+    assert build_vote_channel_reminder_message(
+        MessageId("3000"),
+        datetime(2026, 11, 24, 3, 0, tzinfo=UTC),
+    ) == {
+        "content": (
+            "11/24 (火)の12時に投票を締め切るクポ～\nそれまでにご投票お願いしますクポ。"
+        ),
+        "message_reference": {"message_id": "3000"},
+    }

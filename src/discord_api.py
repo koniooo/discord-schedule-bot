@@ -70,16 +70,8 @@ class Message(TypedDict):
     thread: NotRequired[Thread]
 
 
-type AllowedMentionType = Literal["roles", "users", "everyone"]
-
-
-class AllowedMentions(TypedDict):
-    parse: list[AllowedMentionType]
-
-
 class MessageCreateRequest(TypedDict):
     content: ReadOnly[str]
-    allowed_mentions: ReadOnly[NotRequired[AllowedMentions]]
     poll: ReadOnly[NotRequired[PollCreateRequest]]
 
 

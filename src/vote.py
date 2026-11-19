@@ -1,9 +1,7 @@
 from collections.abc import Sequence
 from datetime import date, datetime, timedelta
-from typing import TypedDict
 
 from discord_api import (
-    AllowedMentions,
     AutoArchiveDuration,
     ChannelId,
     GuildId,
@@ -11,7 +9,6 @@ from discord_api import (
     Message,
     MessageCreateRequest,
     PollAnswer,
-    PollCreateRequest,
     PollResponse,
     User,
     UserId,
@@ -35,12 +32,6 @@ COMMENT_THREAD_AUTO_ARCHIVE_MINUTES: AutoArchiveDuration = 60 * 24 * 7
 ALL_VOTED_REPORTED_EMOJI = "✅"
 
 
-class VoteMessage(TypedDict):
-    content: str
-    allowed_mentions: AllowedMentions
-    poll: PollCreateRequest
-
-
 def build_poll_answers(candidate_days: list[date]) -> list[PollAnswer]:
     answers: list[PollAnswer] = [
         {"poll_media": {"text": format_date_with_weekday(day)}}
@@ -49,10 +40,9 @@ def build_poll_answers(candidate_days: list[date]) -> list[PollAnswer]:
     return answers + [{"poll_media": {"text": NO_AVAILABLE_DAY_TEXT}}]
 
 
-def build_vote_message(candidate_days: list[date]) -> VoteMessage:
+def build_vote_message(candidate_days: list[date]) -> MessageCreateRequest:
     return {
         "content": f"{VOTE_ANNOUNCEMENT_TEXT} @everyone",
-        "allowed_mentions": {"parse": ["everyone"]},
         "poll": {
             "question": {"text": POLL_QUESTION_TEXT},
             "answers": build_poll_answers(candidate_days),

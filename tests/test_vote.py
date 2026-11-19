@@ -45,13 +45,12 @@ def test_build_vote_message_announces_vote_to_everyone() -> None:
 
     assert VOTE_ANNOUNCEMENT_TEXT in vote_message["content"]
     assert "@everyone" in vote_message["content"]
-    assert vote_message["allowed_mentions"] == {"parse": ["everyone"]}
 
 
 def test_build_vote_message_builds_poll_from_candidate_days() -> None:
     candidate_days = [date(2026, 11, 12), date(2026, 11, 13)]
 
-    assert build_vote_message(candidate_days)["poll"] == {
+    assert build_vote_message(candidate_days).get("poll") == {
         "question": {"text": "参加可能日 (22:00～23:30)"},
         "answers": build_poll_answers(candidate_days),
         "duration": 48,

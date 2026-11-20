@@ -126,11 +126,16 @@ def build_request(
     )
 
 
+def _send(request: Request) -> bytes:
+    """Send the request to Discord and return the raw response body."""
+    with urlopen(request) as response:
+        return response.read()
+
+
 def get_current_user(token: str) -> User:
     """GET https://discord.com/api/v10/users/@me"""
     request = build_request("GET", "/users/@me", token)
-    with urlopen(request) as response:
-        return json.load(response)
+    return json.loads(_send(request))
 
 
 def post_message(
@@ -138,8 +143,7 @@ def post_message(
 ) -> Message:
     """POST https://discord.com/api/v10/channels/{channel_id}/messages"""
     request = build_request("POST", f"/channels/{channel_id}/messages", token, body)
-    with urlopen(request) as response:
-        return json.load(response)
+    return json.loads(_send(request))
 
 
 def start_thread_from_message(
@@ -157,8 +161,7 @@ def start_thread_from_message(
         token,
         body,
     )
-    with urlopen(request) as response:
-        return json.load(response)
+    return json.loads(_send(request))
 
 
 def add_reaction(
@@ -171,22 +174,19 @@ def add_reaction(
         f"/channels/{channel_id}/messages/{message_id}/reactions/{encoded_emoji}/@me",
         token,
     )
-    with urlopen(request):
-        pass
+    _send(request)
 
 
 def list_guild_members(token: str, guild_id: GuildId) -> list[GuildMember]:
     """GET https://discord.com/api/v10/guilds/{guild_id}/members?limit=1000"""
     request = build_request("GET", f"/guilds/{guild_id}/members?limit=1000", token)
-    with urlopen(request) as response:
-        return json.load(response)
+    return json.loads(_send(request))
 
 
 def get_channel_messages(token: str, channel_id: ChannelId) -> list[Message]:
     """GET https://discord.com/api/v10/channels/{channel_id}/messages?limit=100"""
     request = build_request("GET", f"/channels/{channel_id}/messages?limit=100", token)
-    with urlopen(request) as response:
-        return json.load(response)
+    return json.loads(_send(request))
 
 
 def get_answer_voters(
@@ -198,13 +198,11 @@ def get_answer_voters(
         f"/channels/{channel_id}/polls/{message_id}/answers/{answer_id}?limit=100",
         token,
     )
-    with urlopen(request) as response:
-        return json.load(response)["users"]
+    return json.loads(_send(request))["users"]
 
 
 def create_dm_channel(token: str, recipient_id: UserId) -> Channel:
     """POST https://discord.com/api/v10/users/@me/channels"""
     body = {"recipient_id": recipient_id}
     request = build_request("POST", "/users/@me/channels", token, body)
-    with urlopen(request) as response:
-        return json.load(response)
+    return json.loads(_send(request))

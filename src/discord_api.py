@@ -1,6 +1,15 @@
 import json
 from collections.abc import Mapping
-from typing import Any, Literal, NewType, NotRequired, ReadOnly, TypedDict, overload
+from typing import (
+    Any,
+    Literal,
+    NamedTuple,
+    NewType,
+    NotRequired,
+    ReadOnly,
+    TypedDict,
+    overload,
+)
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
@@ -124,6 +133,32 @@ def build_request(
         headers=headers,
         data=None if body is None else json.dumps(body).encode(),
     )
+
+
+class DiscordErrorBody(NamedTuple):
+    discord_code: int | None
+    message: str | None
+
+
+def parse_error_body(body: bytes) -> DiscordErrorBody:
+    """Parse Discord's JSON error body. Missing or invalid parts become None."""
+    try:
+        data = json.loads(body)
+    except ValueError:
+        return DiscordErrorBody(discord_code=None, message=None)
+    if not isinstance(data, dict):
+        return DiscordErrorBody(discord_code=None, message=None)
+
+    if "code" in data and isinstance(data["code"], int):
+        discord_code = data["code"]
+    else:
+        discord_code = None
+
+    if "message" in data and isinstance(data["message"], str):
+        message = data["message"]
+    else:
+        message = None
+    return DiscordErrorBody(discord_code=discord_code, message=message)
 
 
 def _send(request: Request) -> bytes:

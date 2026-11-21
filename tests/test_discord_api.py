@@ -9,6 +9,7 @@ import discord_api
 from discord_api import (
     AnswerId,
     ChannelId,
+    DiscordErrorBody,
     GuildId,
     Message,
     MessageId,
@@ -21,6 +22,7 @@ from discord_api import (
     get_current_user,
     get_thread_id_started_from,
     list_guild_members,
+    parse_error_body,
     post_message,
     start_thread_from_message,
 )
@@ -110,6 +112,64 @@ def test_build_request_rejects_post_without_body() -> None:
     with pytest.raises(ValueError, match="body"):
         # Intentionally call POST without body to test the runtime check.
         build_request("POST", "/x", "dummy-token")  # pyright: ignore[reportArgumentType]
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        pytest.param(
+            b'{"message": "Cannot send messages to this user", "code": 50007}',
+            DiscordErrorBody(
+                discord_code=50007, message="Cannot send messages to this user"
+            ),
+            id="discord_error",
+        ),
+        pytest.param(
+            b'{"message": "401: Unauthorized", "code": 0}',
+            DiscordErrorBody(discord_code=0, message="401: Unauthorized"),
+            id="general_error_code_zero",
+        ),
+        pytest.param(
+            b'{"message": "You are being rate limited.", "retry_after": 1.5}',
+            DiscordErrorBody(discord_code=None, message="You are being rate limited."),
+            id="no_code",
+        ),
+        pytest.param(
+            b'{"code": 50007}',
+            DiscordErrorBody(discord_code=50007, message=None),
+            id="no_message",
+        ),
+        pytest.param(
+            b'{"message": "Cannot send messages to this user", "code": "50007"}',
+            DiscordErrorBody(
+                discord_code=None, message="Cannot send messages to this user"
+            ),
+            id="code_wrong_type",
+        ),
+        pytest.param(
+            b'{"message": 123, "code": 50007}',
+            DiscordErrorBody(discord_code=50007, message=None),
+            id="message_wrong_type",
+        ),
+        pytest.param(
+            b'["code"]',
+            DiscordErrorBody(discord_code=None, message=None),
+            id="json_not_object",
+        ),
+        pytest.param(
+            b"<html>502 Bad Gateway</html>",
+            DiscordErrorBody(discord_code=None, message=None),
+            id="not_json",
+        ),
+        pytest.param(
+            b"", DiscordErrorBody(discord_code=None, message=None), id="empty"
+        ),
+    ],
+)
+def test_parse_error_body_returns_code_and_message(
+    body: bytes, expected: DiscordErrorBody
+) -> None:
+    assert parse_error_body(body) == expected
 
 
 def test_get_current_user_builds_request(fake_urlopen: FakeUrlopen) -> None:

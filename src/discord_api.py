@@ -10,6 +10,7 @@ from typing import (
     TypedDict,
     overload,
 )
+from urllib.error import HTTPError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
@@ -30,12 +31,20 @@ class User(TypedDict):
     bot: NotRequired[bool]
 
 
+class GuildMember(TypedDict):
+    user: User
+
+
 class Channel(TypedDict):
     id: ChannelId
 
 
 class Thread(TypedDict):
     name: str
+
+
+# Minutes of inactivity before Discord archives a thread: 1 hour, 1 day, 3 days, 7 days.
+type AutoArchiveDuration = Literal[60, 1440, 4320, 10080]
 
 
 class PollMedia(TypedDict):
@@ -87,14 +96,6 @@ class MessageCreateRequest(TypedDict):
     content: ReadOnly[str]
     message_reference: ReadOnly[NotRequired[MessageReference]]
     poll: ReadOnly[NotRequired[PollCreateRequest]]
-
-
-# Minutes of inactivity before Discord archives a thread: 1 hour, 1 day, 3 days, 7 days.
-type AutoArchiveDuration = Literal[60, 1440, 4320, 10080]
-
-
-class GuildMember(TypedDict):
-    user: User
 
 
 def get_thread_id_started_from(message_id: MessageId) -> ChannelId:
@@ -161,15 +162,88 @@ def parse_error_body(body: bytes) -> DiscordErrorBody:
     return DiscordErrorBody(discord_code=discord_code, message=message)
 
 
+class DiscordApiError(Exception):
+    """A request to the Discord API failed.
+
+    Attributes:
+        status: The HTTP status code, e.g. 403.
+        discord_code: Discord's JSON error code, e.g. 50007, or None.
+        message: Discord's error message, or None.
+        body: The raw response body.
+    """
+
+    def __init__(
+        self,
+        *,
+        method: str,
+        path: str,
+        status: int,
+        reason: str,
+        discord_code: int | None,
+        message: str | None,
+        body: bytes,
+    ) -> None:
+        summary = f"{method} {path} returned {status} {reason}"
+        if message is not None:
+            summary += f": {message}"
+        elif body:
+            # Keep it on one line and short, even for a long HTML error page.
+            snippet = " ".join(body.decode(errors="replace").split())[:500]
+            summary += f": {snippet}"
+        if discord_code is not None:
+            summary += f" (Discord code {discord_code})"
+
+        super().__init__(summary)
+        self.status = status
+        self.discord_code = discord_code
+        self.message = message
+        self.body = body
+
+
 def _send(request: Request) -> bytes:
-    """Send the request to Discord and return the raw response body."""
-    with urlopen(request) as response:
-        return response.read()
+    """Send the request to Discord and return the raw response body.
+
+    Raises DiscordApiError when Discord answers with an HTTP error status.
+    """
+    try:
+        with urlopen(request) as response:
+            return response.read()
+    except HTTPError as error:
+        body = error.read()
+        error_body = parse_error_body(body)
+        raise DiscordApiError(
+            method=request.get_method(),
+            path=request.selector,
+            status=error.code,
+            reason=error.reason,
+            discord_code=error_body.discord_code,
+            message=error_body.message,
+            body=body,
+        ) from error
 
 
 def get_current_user(token: str) -> User:
     """GET https://discord.com/api/v10/users/@me"""
     request = build_request("GET", "/users/@me", token)
+    return json.loads(_send(request))
+
+
+def create_dm_channel(token: str, recipient_id: UserId) -> Channel:
+    """POST https://discord.com/api/v10/users/@me/channels"""
+    body = {"recipient_id": recipient_id}
+    request = build_request("POST", "/users/@me/channels", token, body)
+    return json.loads(_send(request))
+
+
+def list_guild_members(token: str, guild_id: GuildId) -> list[GuildMember]:
+    """GET https://discord.com/api/v10/guilds/{guild_id}/members?limit=1000"""
+    request = build_request("GET", f"/guilds/{guild_id}/members?limit=1000", token)
+    return json.loads(_send(request))
+
+
+def get_channel_messages(token: str, channel_id: ChannelId) -> list[Message]:
+    """GET https://discord.com/api/v10/channels/{channel_id}/messages?limit=100"""
+    request = build_request("GET", f"/channels/{channel_id}/messages?limit=100", token)
     return json.loads(_send(request))
 
 
@@ -179,6 +253,19 @@ def post_message(
     """POST https://discord.com/api/v10/channels/{channel_id}/messages"""
     request = build_request("POST", f"/channels/{channel_id}/messages", token, body)
     return json.loads(_send(request))
+
+
+def add_reaction(
+    token: str, channel_id: ChannelId, message_id: MessageId, emoji: str
+) -> None:
+    """PUT https://discord.com/api/v10/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me"""
+    encoded_emoji = quote(emoji, safe="")
+    request = build_request(
+        "PUT",
+        f"/channels/{channel_id}/messages/{message_id}/reactions/{encoded_emoji}/@me",
+        token,
+    )
+    _send(request)
 
 
 def start_thread_from_message(
@@ -199,31 +286,6 @@ def start_thread_from_message(
     return json.loads(_send(request))
 
 
-def add_reaction(
-    token: str, channel_id: ChannelId, message_id: MessageId, emoji: str
-) -> None:
-    """PUT https://discord.com/api/v10/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me"""
-    encoded_emoji = quote(emoji, safe="")
-    request = build_request(
-        "PUT",
-        f"/channels/{channel_id}/messages/{message_id}/reactions/{encoded_emoji}/@me",
-        token,
-    )
-    _send(request)
-
-
-def list_guild_members(token: str, guild_id: GuildId) -> list[GuildMember]:
-    """GET https://discord.com/api/v10/guilds/{guild_id}/members?limit=1000"""
-    request = build_request("GET", f"/guilds/{guild_id}/members?limit=1000", token)
-    return json.loads(_send(request))
-
-
-def get_channel_messages(token: str, channel_id: ChannelId) -> list[Message]:
-    """GET https://discord.com/api/v10/channels/{channel_id}/messages?limit=100"""
-    request = build_request("GET", f"/channels/{channel_id}/messages?limit=100", token)
-    return json.loads(_send(request))
-
-
 def get_answer_voters(
     token: str, channel_id: ChannelId, message_id: MessageId, answer_id: AnswerId
 ) -> list[User]:
@@ -234,10 +296,3 @@ def get_answer_voters(
         token,
     )
     return json.loads(_send(request))["users"]
-
-
-def create_dm_channel(token: str, recipient_id: UserId) -> Channel:
-    """POST https://discord.com/api/v10/users/@me/channels"""
-    body = {"recipient_id": recipient_id}
-    request = build_request("POST", "/users/@me/channels", token, body)
-    return json.loads(_send(request))

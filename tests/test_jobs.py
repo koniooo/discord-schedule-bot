@@ -89,8 +89,8 @@ def test_start_vote_posts_vote_message_and_starts_comment_thread(
     assert start_thread_from_message_call["auto_archive_duration"] == 10080
 
     assert caplog.messages == [
-        "Vote 3000: posted for 11/30-12/6",
-        "Vote 3000: started thread '11/30-12/6 💬コメント'",
+        "Vote 3000 (11/30-12/6): posted",
+        "Vote 3000 (11/30-12/6): started thread '11/30-12/6 💬コメント'",
     ]
 
 
@@ -220,12 +220,13 @@ def run_report_if_all_voted(now: datetime) -> None:
 
 
 def test_report_if_all_voted_dms_master_then_marks_vote_when_everyone_voted(
-    fake_discord: FakeDiscord,
+    fake_discord: FakeDiscord, caplog: pytest.LogCaptureFixture
 ) -> None:
     fake_discord.voters_by_answer_id = {
         AnswerId(1): [{"id": UserId("4001")}],
         AnswerId(2): [{"id": UserId("4002")}],
     }
+    caplog.set_level(logging.INFO, logger="jobs")
 
     run_report_if_all_voted(POLL_EXPIRES_AT - timedelta(days=1))
 
@@ -244,6 +245,10 @@ def test_report_if_all_voted_dms_master_then_marks_vote_when_everyone_voted(
     # Two humans: the bot member must not be counted.
     assert report_content.startswith("2人全員が投票した")
     assert "https://discord.com/channels/1001/3000" in report_content
+    assert caplog.messages == [
+        "Vote 3000 (11/30-12/6): 2/2 members have voted",
+        "Vote 3000 (11/30-12/6): sent the all-voted report to the master",
+    ]
 
 
 def test_report_if_all_voted_does_not_report_while_someone_has_not_voted(
@@ -270,7 +275,7 @@ def test_report_if_all_voted_logs_how_many_human_members_have_voted(
 
     run_report_if_all_voted(POLL_EXPIRES_AT - timedelta(days=1))
 
-    assert "Vote 11/30-12/6 (3000): 1/2 members have voted" in caplog.messages
+    assert "Vote 3000 (11/30-12/6): 1/2 members have voted" in caplog.messages
 
 
 def test_report_if_all_voted_still_reports_without_thread(
@@ -284,7 +289,7 @@ def test_report_if_all_voted_still_reports_without_thread(
 
     run_report_if_all_voted(POLL_EXPIRES_AT - timedelta(days=1))
 
-    assert "Vote (no thread) (3000): 2/2 members have voted" in caplog.messages
+    assert "Vote 3000 (no thread): 2/2 members have voted" in caplog.messages
     assert fake_discord.call_names()[-3:] == [
         "create_dm_channel",
         "post_message",
@@ -393,8 +398,9 @@ def test_send_reminders_dms_each_human_non_voter(
             "https://discord.com/channels/1001/2000/3000" in reminder_message["content"]
         )
     assert (
-        "Sent 2/2 reminder DMs; sent to: ['4001', '4002']; cannot send to: []; "
-        "no mutual guilds with: []; failed for: []" in caplog.messages
+        "Vote 3000 (11/30-12/6): sent 2/2 reminder DMs; sent to: ['4001', '4002']; "
+        "cannot send to: []; no mutual guilds with: []; failed for: []"
+        in caplog.messages
     )
 
 
@@ -410,7 +416,10 @@ def test_send_reminders_does_nothing_when_everyone_voted(
 
     assert "create_dm_channel" not in fake_discord.call_names()
     assert "post_message" not in fake_discord.call_names()
-    assert "Everyone has voted; no reminders needed" in caplog.messages
+    assert (
+        "Vote 3000 (11/30-12/6): everyone has voted; no reminders needed"
+        in caplog.messages
+    )
 
 
 def test_send_reminders_warns_when_poll_is_closed(
@@ -419,7 +428,9 @@ def test_send_reminders_warns_when_poll_is_closed(
     run_send_reminders(POLL_EXPIRES_AT)
 
     assert fake_discord.call_names() == ["get_channel_messages", "get_current_user"]
-    assert "Vote 3000 is already closed; no reminders sent" in caplog.messages
+    assert (
+        "Vote 3000 (11/30-12/6): already closed; no reminders sent" in caplog.messages
+    )
 
 
 @pytest.mark.parametrize(
@@ -427,15 +438,15 @@ def test_send_reminders_warns_when_poll_is_closed(
     [
         pytest.param(
             50007,
-            "Sent 1/2 reminder DMs; sent to: ['4002']; cannot send to: ['4001']; "
-            "no mutual guilds with: []; failed for: []",
+            "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: ['4002']; "
+            "cannot send to: ['4001']; no mutual guilds with: []; failed for: []",
             id="cannot_send_messages_to_user",
         ),
         # Seen on the real server when a member turned off DMs for the server.
         pytest.param(
             50278,
-            "Sent 1/2 reminder DMs; sent to: ['4002']; cannot send to: []; "
-            "no mutual guilds with: ['4001']; failed for: []",
+            "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: ['4002']; "
+            "cannot send to: []; no mutual guilds with: ['4001']; failed for: []",
             id="no_mutual_guilds",
         ),
     ],
@@ -499,11 +510,13 @@ def test_send_reminders_continues_after_other_dm_errors(
     [failure_record] = [
         record
         for record in caplog.records
-        if record.getMessage() == "Failed to send a reminder DM to 4001"
+        if record.getMessage()
+        == "Vote 3000 (11/30-12/6): failed to send a reminder DM to 4001"
     ]
     # logger.exception keeps the traceback, so the cause can be found in the logs.
     assert failure_record.exc_info is not None
     assert (
-        "Sent 1/2 reminder DMs; sent to: ['4002']; cannot send to: []; "
-        "no mutual guilds with: []; failed for: ['4001']" in caplog.messages
+        "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: ['4002']; "
+        "cannot send to: []; no mutual guilds with: []; failed for: ['4001']"
+        in caplog.messages
     )

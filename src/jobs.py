@@ -48,7 +48,7 @@ def start_vote(token: str, channel_id: ChannelId, today: date) -> None:
     vote_message = post_message(token, channel_id, build_vote_message(candidate_days))
     vote_message_id = vote_message["id"]
     date_range = format_date_range(candidate_days[0], candidate_days[-1])
-    logger.info("Vote %s: posted for %s", vote_message_id, date_range)
+    logger.info("Vote %s (%s): posted", vote_message_id, date_range)
 
     thread_name = format_comment_thread_name(candidate_days)
     start_thread_from_message(
@@ -58,7 +58,9 @@ def start_vote(token: str, channel_id: ChannelId, today: date) -> None:
         thread_name,
         COMMENT_THREAD_AUTO_ARCHIVE_MINUTES,
     )
-    logger.info("Vote %s: started thread '%s'", vote_message_id, thread_name)
+    logger.info(
+        "Vote %s (%s): started thread '%s'", vote_message_id, date_range, thread_name
+    )
 
 
 def _find_vote_message(
@@ -72,7 +74,11 @@ def _find_vote_message(
         logger.warning("No vote message found in channel %s", channel_id)
         return None
     if "poll" not in vote_message:
-        logger.warning("Vote message %s has no poll", vote_message["id"])
+        logger.warning(
+            "Vote %s (%s): the message has no poll",
+            vote_message["id"],
+            _format_vote_label(vote_message),
+        )
         return None
     return vote_message, vote_message["poll"]
 
@@ -90,7 +96,7 @@ def _fetch_voter_ids(
 
 def _format_vote_label(vote_message: Message) -> str:
     thread = vote_message.get("thread")
-    thread_name = thread["name"] if thread is not None else "(no thread)"
+    thread_name = thread["name"] if thread is not None else "no thread"
     return thread_name.removesuffix(COMMENT_THREAD_NAME_SUFFIX).rstrip()
 
 
@@ -116,6 +122,7 @@ def report_if_all_voted(
         return
     vote_message, poll = found
     vote_message_id = vote_message["id"]
+    vote_label = _format_vote_label(vote_message)
 
     poll_expires_at = get_poll_expires_at(poll)
     if now >= poll_expires_at:
@@ -135,8 +142,8 @@ def report_if_all_voted(
 
     logger.info(
         "Vote %s (%s): %d/%d members have voted",
-        _format_vote_label(vote_message),
         vote_message_id,
+        vote_label,
         voted_count,
         human_member_count,
     )
@@ -151,6 +158,11 @@ def report_if_all_voted(
         poll_expires_at,
     )
     _send_dm(token, master_user_id, all_voted_report_message)
+    logger.info(
+        "Vote %s (%s): sent the all-voted report to the master",
+        vote_message_id,
+        vote_label,
+    )
     add_reaction(token, channel_id, vote_message_id, ALL_VOTED_REPORTED_EMOJI)
 
 
@@ -171,16 +183,25 @@ def send_reminders(
         return
     vote_message, poll = found
     vote_message_id = vote_message["id"]
+    vote_label = _format_vote_label(vote_message)
     poll_expires_at = get_poll_expires_at(poll)
     if now >= poll_expires_at:
-        logger.warning("Vote %s is already closed; no reminders sent", vote_message_id)
+        logger.warning(
+            "Vote %s (%s): already closed; no reminders sent",
+            vote_message_id,
+            vote_label,
+        )
         return
 
     voter_ids = _fetch_voter_ids(token, channel_id, vote_message_id, poll)
     guild_members = list_guild_members(token, guild_id)
     human_non_voter_ids = collect_human_non_voter_ids(guild_members, voter_ids)
     if not human_non_voter_ids:
-        logger.info("Everyone has voted; no reminders needed")
+        logger.info(
+            "Vote %s (%s): everyone has voted; no reminders needed",
+            vote_message_id,
+            vote_label,
+        )
         return
 
     dm_sent_ids: list[UserId] = []
@@ -200,14 +221,20 @@ def send_reminders(
                 dm_no_mutual_guild_ids.append(human_non_voter_id)
             else:
                 logger.exception(
-                    "Failed to send a reminder DM to %s", human_non_voter_id
+                    "Vote %s (%s): failed to send a reminder DM to %s",
+                    vote_message_id,
+                    vote_label,
+                    human_non_voter_id,
                 )
                 dm_failed_ids.append(human_non_voter_id)
         else:
             dm_sent_ids.append(human_non_voter_id)
 
     logger.info(
-        "Sent %d/%d reminder DMs; sent to: %s; cannot send to: %s; no mutual guilds with: %s; failed for: %s",
+        "Vote %s (%s): sent %d/%d reminder DMs; sent to: %s; cannot send to: %s; "
+        "no mutual guilds with: %s; failed for: %s",
+        vote_message_id,
+        vote_label,
         len(dm_sent_ids),
         len(human_non_voter_ids),
         dm_sent_ids,

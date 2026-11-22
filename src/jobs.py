@@ -26,7 +26,7 @@ from vote import (
     COMMENT_THREAD_NAME_SUFFIX,
     build_all_voted_report_message,
     build_vote_message,
-    collect_non_voter_ids,
+    collect_human_non_voter_ids,
     collect_voter_ids,
     find_latest_vote_message,
     format_comment_thread_name,
@@ -116,13 +116,13 @@ def report_if_all_voted(
 
     voter_ids = _fetch_voter_ids(token, channel_id, vote_message_id, poll)
     guild_members = list_guild_members(token, guild_id)
-    non_voter_ids = collect_non_voter_ids(guild_members, voter_ids)
+    human_non_voter_ids = collect_human_non_voter_ids(guild_members, voter_ids)
 
     human_members = [
         guild_member for guild_member in guild_members if is_human(guild_member["user"])
     ]
     human_member_count = len(human_members)
-    voted_count = human_member_count - len(non_voter_ids)
+    voted_count = human_member_count - len(human_non_voter_ids)
 
     logger.info(
         "Vote %s (%s): %d/%d members have voted",
@@ -132,7 +132,7 @@ def report_if_all_voted(
         human_member_count,
     )
 
-    if non_voter_ids:
+    if human_non_voter_ids:
         return
 
     all_voted_report_message = build_all_voted_report_message(

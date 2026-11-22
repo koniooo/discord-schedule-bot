@@ -21,7 +21,7 @@ from vote import (
     build_poll_answers,
     build_vote_channel_reminder_message,
     build_vote_message,
-    collect_non_voter_ids,
+    collect_human_non_voter_ids,
     collect_voter_ids,
     find_latest_vote_message,
     format_comment_thread_name,
@@ -216,10 +216,10 @@ def test_collect_voter_ids_returns_ids_of_all_voters(
         ),
     ],
 )
-def test_collect_non_voter_ids_returns_ids_of_human_non_voters(
+def test_collect_human_non_voter_ids_excludes_bots_and_voters(
     members: list[GuildMember], voter_ids: set[UserId], expected: list[UserId]
 ) -> None:
-    assert collect_non_voter_ids(members, voter_ids) == expected
+    assert collect_human_non_voter_ids(members, voter_ids) == expected
 
 
 @pytest.mark.parametrize(

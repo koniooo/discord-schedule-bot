@@ -236,7 +236,10 @@ def create_dm_channel(token: str, recipient_id: UserId) -> Channel:
 
 
 def list_guild_members(token: str, guild_id: GuildId) -> list[GuildMember]:
-    """GET https://discord.com/api/v10/guilds/{guild_id}/members?limit=1000"""
+    """GET https://discord.com/api/v10/guilds/{guild_id}/members?limit=1000
+
+    Returns every member of the server, including bots.
+    """
     request = build_request("GET", f"/guilds/{guild_id}/members?limit=1000", token)
     return json.loads(_send(request))
 

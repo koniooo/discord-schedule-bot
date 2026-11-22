@@ -80,7 +80,7 @@ def is_human(user: User) -> bool:
     return not user.get("bot", False)
 
 
-def collect_non_voter_ids(
+def collect_human_non_voter_ids(
     guild_members: list[GuildMember], voter_ids: set[UserId]
 ) -> list[UserId]:
     """Return the ids of human members who have not voted, in member order."""

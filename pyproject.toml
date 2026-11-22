@@ -46,7 +46,10 @@ select = [
     "RSE",
     "ERA",
     "DTZ",
+    "RUF",
 ]
+# "～" (full-width tilde) is intended in the Japanese messages.
+allowed-confusables = ["～"]
 
 [tool.pyright]
 include = ["."]

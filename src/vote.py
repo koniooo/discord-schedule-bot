@@ -38,7 +38,7 @@ def build_poll_answers(candidate_days: list[date]) -> list[PollAnswer]:
         {"poll_media": {"text": format_date_with_weekday(day)}}
         for day in candidate_days
     ]
-    return answers + [{"poll_media": {"text": NO_AVAILABLE_DAY_TEXT}}]
+    return [*answers, {"poll_media": {"text": NO_AVAILABLE_DAY_TEXT}}]
 
 
 def build_vote_message(candidate_days: list[date]) -> MessageCreateRequest:

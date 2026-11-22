@@ -9,6 +9,7 @@
   },
   "cSpell.words": [
     "caplog",
+    "confusables",
     "delenv",
     "dotenv",
     "pytest",

@@ -45,6 +45,7 @@ select = [
     "N",
     "RSE",
     "ERA",
+    "DTZ",
 ]
 
 [tool.pyright]

@@ -10,6 +10,7 @@ from discord_api import (
     AutoArchiveDuration,
     Channel,
     ChannelId,
+    DiscordApiError,
     GuildId,
     GuildMember,
     Message,
@@ -19,7 +20,7 @@ from discord_api import (
     User,
     UserId,
 )
-from jobs import report_if_all_voted, start_vote
+from jobs import report_if_all_voted, send_reminders, start_vote
 from schedule import get_monday_to_sunday_after_next
 from vote import build_vote_message
 
@@ -93,8 +94,18 @@ type Call = tuple[object, ...]
 POLL_EXPIRES_AT = datetime(2026, 11, 24, 3, 0, tzinfo=UTC)
 
 
-class FakeDiscordError(Exception):
-    pass
+def make_discord_api_error(
+    status: int, reason: str, discord_code: int | None
+) -> DiscordApiError:
+    return DiscordApiError(
+        method="POST",
+        path="/api/v10/x",
+        status=status,
+        reason=reason,
+        discord_code=discord_code,
+        message=None,
+        body=b"",
+    )
 
 
 def make_vote_message(
@@ -131,7 +142,13 @@ class FakeDiscord:
             {"user": {"id": UserId("4001")}},
             {"user": {"id": UserId("4002")}},
         ]
-        self.post_message_error: Exception | None = None
+        # One DM channel per user, so a test can make the DM to one user fail.
+        self.dm_channel_ids: dict[UserId, ChannelId] = {
+            UserId("4001"): ChannelId("2101"),
+            UserId("4002"): ChannelId("2102"),
+            UserId("4003"): ChannelId("2001"),
+        }
+        self.post_message_errors: dict[ChannelId, Exception] = {}
 
     def get_channel_messages(self, _token: str, channel_id: ChannelId) -> list[Message]:
         self.calls.append(("get_channel_messages", channel_id))
@@ -157,14 +174,14 @@ class FakeDiscord:
 
     def create_dm_channel(self, _token: str, recipient_id: UserId) -> Channel:
         self.calls.append(("create_dm_channel", recipient_id))
-        return {"id": ChannelId("2001")}
+        return {"id": self.dm_channel_ids[recipient_id]}
 
     def post_message(
         self, _token: str, channel_id: ChannelId, body: MessageCreateRequest
     ) -> Message:
         self.calls.append(("post_message", channel_id))
-        if self.post_message_error is not None:
-            raise self.post_message_error
+        if channel_id in self.post_message_errors:
+            raise self.post_message_errors[channel_id]
         self.posted_messages.append((channel_id, body))
         return {"id": MessageId("3001"), "author": {"id": UserId("4000")}}
 
@@ -329,9 +346,158 @@ def test_report_if_all_voted_does_not_mark_vote_when_dm_fails(
     fake_discord.voters_by_answer_id = {
         AnswerId(1): [{"id": UserId("4001")}, {"id": UserId("4002")}]
     }
-    fake_discord.post_message_error = FakeDiscordError()
+    fake_discord.post_message_errors = {
+        ChannelId("2001"): make_discord_api_error(500, "Internal Server Error", None)
+    }
 
-    with pytest.raises(FakeDiscordError):
+    with pytest.raises(DiscordApiError):
         run_report_if_all_voted(POLL_EXPIRES_AT - timedelta(days=1))
 
     assert "add_reaction" not in fake_discord.call_names()
+
+
+def run_send_reminders(now: datetime) -> None:
+    send_reminders("dummy-token", GuildId("1001"), ChannelId("2000"), now)
+
+
+def test_send_reminders_dms_each_human_non_voter(
+    fake_discord: FakeDiscord, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO, logger="jobs")
+
+    run_send_reminders(POLL_EXPIRES_AT - timedelta(days=1))
+
+    assert fake_discord.calls == [
+        ("get_channel_messages", "2000"),
+        ("get_current_user",),
+        ("get_answer_voters", "2000", "3000", 1),
+        ("get_answer_voters", "2000", "3000", 2),
+        ("list_guild_members", "1001"),
+        ("create_dm_channel", "4001"),
+        ("post_message", "2101"),
+        ("create_dm_channel", "4002"),
+        ("post_message", "2102"),
+    ]
+    assert [channel_id for channel_id, _ in fake_discord.posted_messages] == [
+        "2101",
+        "2102",
+    ]
+    for _, reminder_message in fake_discord.posted_messages:
+        assert (
+            "https://discord.com/channels/1001/2000/3000" in reminder_message["content"]
+        )
+    assert (
+        "Sent 2/2 reminder DMs; sent to: ['4001', '4002']; cannot send to: []; "
+        "no mutual guilds with: []; failed for: []" in caplog.messages
+    )
+
+
+def test_send_reminders_does_nothing_when_everyone_voted(
+    fake_discord: FakeDiscord, caplog: pytest.LogCaptureFixture
+) -> None:
+    fake_discord.voters_by_answer_id = {
+        AnswerId(1): [{"id": UserId("4001")}, {"id": UserId("4002")}]
+    }
+    caplog.set_level(logging.INFO, logger="jobs")
+
+    run_send_reminders(POLL_EXPIRES_AT - timedelta(days=1))
+
+    assert "create_dm_channel" not in fake_discord.call_names()
+    assert "post_message" not in fake_discord.call_names()
+    assert "Everyone has voted; no reminders needed" in caplog.messages
+
+
+def test_send_reminders_warns_when_poll_is_closed(
+    fake_discord: FakeDiscord, caplog: pytest.LogCaptureFixture
+) -> None:
+    run_send_reminders(POLL_EXPIRES_AT)
+
+    assert fake_discord.call_names() == ["get_channel_messages", "get_current_user"]
+    assert "Vote 3000 is already closed; no reminders sent" in caplog.messages
+
+
+@pytest.mark.parametrize(
+    ("discord_code", "expected_summary"),
+    [
+        pytest.param(
+            50007,
+            "Sent 1/2 reminder DMs; sent to: ['4002']; cannot send to: ['4001']; "
+            "no mutual guilds with: []; failed for: []",
+            id="cannot_send_messages_to_user",
+        ),
+        # Seen on the real server when a member turned off DMs for the server.
+        pytest.param(
+            50278,
+            "Sent 1/2 reminder DMs; sent to: ['4002']; cannot send to: []; "
+            "no mutual guilds with: ['4001']; failed for: []",
+            id="no_mutual_guilds",
+        ),
+    ],
+)
+def test_send_reminders_replies_in_vote_channel_when_a_dm_is_closed(
+    discord_code: int,
+    expected_summary: str,
+    fake_discord: FakeDiscord,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # The first member's DMs are closed, so the second member proves the loop goes on.
+    fake_discord.post_message_errors = {
+        ChannelId("2101"): make_discord_api_error(403, "Forbidden", discord_code)
+    }
+    caplog.set_level(logging.INFO, logger="jobs")
+
+    run_send_reminders(POLL_EXPIRES_AT - timedelta(days=1))
+
+    assert [channel_id for channel_id, _ in fake_discord.posted_messages] == [
+        "2102",
+        "2000",
+    ]
+    vote_channel_reminder_message = fake_discord.posted_messages[1][1]
+    assert vote_channel_reminder_message.get("message_reference") == {
+        "message_id": "3000"
+    }
+    # The summary tells the two codes apart.
+    assert expected_summary in caplog.messages
+
+
+def test_send_reminders_replies_once_when_several_dms_fail(
+    fake_discord: FakeDiscord,
+) -> None:
+    # One closed DM and one other error: both kinds lead to the same single reply.
+    fake_discord.post_message_errors = {
+        ChannelId("2101"): make_discord_api_error(403, "Forbidden", 50007),
+        ChannelId("2102"): make_discord_api_error(500, "Internal Server Error", None),
+    }
+
+    run_send_reminders(POLL_EXPIRES_AT - timedelta(days=1))
+
+    # One reply for all failed DMs, not one per member.
+    assert [channel_id for channel_id, _ in fake_discord.posted_messages] == ["2000"]
+
+
+def test_send_reminders_continues_after_other_dm_errors(
+    fake_discord: FakeDiscord, caplog: pytest.LogCaptureFixture
+) -> None:
+    fake_discord.post_message_errors = {
+        ChannelId("2101"): make_discord_api_error(500, "Internal Server Error", None)
+    }
+    caplog.set_level(logging.INFO, logger="jobs")
+
+    run_send_reminders(POLL_EXPIRES_AT - timedelta(days=1))
+
+    # The failed DM is covered by one reply in the vote channel.
+    assert [channel_id for channel_id, _ in fake_discord.posted_messages] == [
+        "2102",
+        "2000",
+    ]
+    [failure_record] = [
+        record
+        for record in caplog.records
+        if record.getMessage() == "Failed to send a reminder DM to 4001"
+    ]
+    # logger.exception keeps the traceback, so the cause can be found in the logs.
+    assert failure_record.exc_info is not None
+    assert (
+        "Sent 1/2 reminder DMs; sent to: ['4002']; cannot send to: []; "
+        "no mutual guilds with: []; failed for: ['4001']" in caplog.messages
+    )

@@ -16,6 +16,9 @@ from urllib.request import Request, urlopen
 
 DISCORD_API_BASE_URL = "https://discord.com/api/v10"
 USER_AGENT = "DiscordBot (https://github.com/koniooo/discord-schedule-bot, 0.1.0)"
+# Discord's JSON error codes when a user can't receive DMs from the bot.
+CANNOT_SEND_MESSAGES_TO_USER = 50007
+CANNOT_SEND_MESSAGES_TO_USER_NO_MUTUAL_GUILDS = 50278
 
 type HttpMethod = Literal["GET", "POST", "PUT"]
 

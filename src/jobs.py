@@ -92,8 +92,8 @@ def _send_dm(token: str, recipient_id: UserId, body: MessageCreateRequest) -> No
 
 def report_if_all_voted(
     token: str,
-    channel_id: ChannelId,
     guild_id: GuildId,
+    channel_id: ChannelId,
     master_user_id: UserId,
     now: datetime,
 ) -> None:

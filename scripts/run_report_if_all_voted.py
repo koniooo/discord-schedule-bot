@@ -15,7 +15,7 @@ def main() -> None:
     channel_id = ChannelId(get_required_env("DISCORD_CHANNEL_ID"))
     guild_id = GuildId(get_required_env("DISCORD_GUILD_ID"))
     master_user_id = UserId(get_required_env("DISCORD_MASTER_USER_ID"))
-    report_if_all_voted(token, channel_id, guild_id, master_user_id, datetime.now(UTC))
+    report_if_all_voted(token, guild_id, channel_id, master_user_id, datetime.now(UTC))
 
 
 if __name__ == "__main__":

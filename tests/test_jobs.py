@@ -192,7 +192,7 @@ def fake_discord(monkeypatch: pytest.MonkeyPatch) -> FakeDiscord:
 
 def run_report_if_all_voted(now: datetime) -> None:
     report_if_all_voted(
-        "dummy-token", ChannelId("2000"), GuildId("1001"), UserId("4003"), now
+        "dummy-token", GuildId("1001"), ChannelId("2000"), UserId("4003"), now
     )
 
 

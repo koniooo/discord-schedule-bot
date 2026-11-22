@@ -1,7 +1,5 @@
 import logging
 from datetime import UTC, datetime
-from pprint import pprint
-from urllib.error import HTTPError
 
 from dotenv import load_dotenv
 
@@ -21,8 +19,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except HTTPError as error:
-        pprint(error.read().decode())
-        raise
+    main()

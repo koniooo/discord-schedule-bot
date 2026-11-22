@@ -298,7 +298,7 @@ def test_report_if_all_voted_still_reports_without_thread(
 
 
 def test_report_if_all_voted_does_nothing_when_already_reported(
-    fake_discord: FakeDiscord,
+    fake_discord: FakeDiscord, caplog: pytest.LogCaptureFixture
 ) -> None:
     fake_discord.messages = [
         make_vote_message(reactions=[{"me": True, "emoji": {"name": "✅"}}])
@@ -306,22 +306,26 @@ def test_report_if_all_voted_does_nothing_when_already_reported(
     fake_discord.voters_by_answer_id = {
         AnswerId(1): [{"id": UserId("4001")}, {"id": UserId("4002")}]
     }
+    caplog.set_level(logging.DEBUG, logger="jobs")
 
     run_report_if_all_voted(POLL_EXPIRES_AT - timedelta(days=1))
 
     assert fake_discord.call_names() == ["get_channel_messages", "get_current_user"]
+    assert caplog.messages == ["Vote 3000 (11/30-12/6): already reported"]
 
 
 def test_report_if_all_voted_does_nothing_at_poll_expiry(
-    fake_discord: FakeDiscord,
+    fake_discord: FakeDiscord, caplog: pytest.LogCaptureFixture
 ) -> None:
     fake_discord.voters_by_answer_id = {
         AnswerId(1): [{"id": UserId("4001")}, {"id": UserId("4002")}]
     }
+    caplog.set_level(logging.DEBUG, logger="jobs")
 
     run_report_if_all_voted(POLL_EXPIRES_AT)
 
     assert fake_discord.call_names() == ["get_channel_messages", "get_current_user"]
+    assert caplog.messages == ["Vote 3000 (11/30-12/6): already closed"]
 
 
 def test_report_if_all_voted_reports_one_second_before_poll_expiry(
@@ -402,6 +406,11 @@ def test_send_reminders_dms_each_human_non_voter(
         "cannot send to: []; no mutual guilds with: []; failed for: []"
         in caplog.messages
     )
+    # Every DM worked, so there is no reply in the vote channel to log.
+    assert (
+        "Vote 3000 (11/30-12/6): posted a reminder in the vote channel"
+        not in caplog.messages
+    )
 
 
 def test_send_reminders_does_nothing_when_everyone_voted(
@@ -473,8 +482,30 @@ def test_send_reminders_replies_in_vote_channel_when_a_dm_is_closed(
     assert vote_channel_reminder_message.get("message_reference") == {
         "message_id": "3000"
     }
-    # The summary tells the two codes apart.
-    assert expected_summary in caplog.messages
+    # The summary tells the two codes apart, and the reply is logged after it.
+    assert caplog.messages == [
+        expected_summary,
+        "Vote 3000 (11/30-12/6): posted a reminder in the vote channel",
+    ]
+
+
+def test_send_reminders_logs_the_channel_reply_only_after_posting_it(
+    fake_discord: FakeDiscord, caplog: pytest.LogCaptureFixture
+) -> None:
+    fake_discord.post_message_errors = {
+        ChannelId("2101"): make_discord_api_error(403, "Forbidden", 50007),
+        ChannelId("2000"): make_discord_api_error(500, "Internal Server Error", None),
+    }
+    caplog.set_level(logging.INFO, logger="jobs")
+
+    with pytest.raises(DiscordApiError):
+        run_send_reminders(POLL_EXPIRES_AT - timedelta(days=1))
+
+    # The summary is logged before the reply, so it survives the failed post.
+    assert caplog.messages == [
+        "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: ['4002']; "
+        "cannot send to: ['4001']; no mutual guilds with: []; failed for: []"
+    ]
 
 
 def test_send_reminders_replies_once_when_several_dms_fail(
@@ -518,5 +549,9 @@ def test_send_reminders_continues_after_other_dm_errors(
     assert (
         "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: ['4002']; "
         "cannot send to: []; no mutual guilds with: []; failed for: ['4001']"
+        in caplog.messages
+    )
+    assert (
+        "Vote 3000 (11/30-12/6): posted a reminder in the vote channel"
         in caplog.messages
     )

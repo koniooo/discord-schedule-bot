@@ -126,8 +126,10 @@ def report_if_all_voted(
 
     poll_expires_at = get_poll_expires_at(poll)
     if now >= poll_expires_at:
+        logger.debug("Vote %s (%s): already closed", vote_message_id, vote_label)
         return
     if has_own_reaction(vote_message, ALL_VOTED_REPORTED_EMOJI):
+        logger.debug("Vote %s (%s): already reported", vote_message_id, vote_label)
         return
 
     voter_ids = _fetch_voter_ids(token, channel_id, vote_message_id, poll)
@@ -248,3 +250,8 @@ def send_reminders(
             vote_message_id, poll_expires_at
         )
         post_message(token, channel_id, vote_channel_reminder_message)
+        logger.info(
+            "Vote %s (%s): posted a reminder in the vote channel",
+            vote_message_id,
+            vote_label,
+        )

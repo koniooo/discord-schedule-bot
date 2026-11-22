@@ -22,7 +22,7 @@ from discord_api import (
     post_message,
     start_thread_from_message,
 )
-from schedule import get_monday_to_sunday_after_next
+from schedule import format_date_range, get_monday_to_sunday_after_next
 from vote import (
     ALL_VOTED_REPORTED_EMOJI,
     COMMENT_THREAD_AUTO_ARCHIVE_MINUTES,
@@ -46,15 +46,19 @@ logger = logging.getLogger(__name__)
 def start_vote(token: str, channel_id: ChannelId, today: date) -> None:
     candidate_days = get_monday_to_sunday_after_next(today)
     vote_message = post_message(token, channel_id, build_vote_message(candidate_days))
+    vote_message_id = vote_message["id"]
+    date_range = format_date_range(candidate_days[0], candidate_days[-1])
+    logger.info("Vote %s: posted for %s", vote_message_id, date_range)
 
     thread_name = format_comment_thread_name(candidate_days)
     start_thread_from_message(
         token,
         channel_id,
-        vote_message["id"],
+        vote_message_id,
         thread_name,
         COMMENT_THREAD_AUTO_ARCHIVE_MINUTES,
     )
+    logger.info("Vote %s: started thread '%s'", vote_message_id, thread_name)
 
 
 def _find_vote_message(

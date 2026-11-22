@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -9,6 +10,7 @@ from schedule import JST
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO)
     load_dotenv()
     token = get_required_env("DISCORD_BOT_TOKEN")
     channel_id = ChannelId(get_required_env("DISCORD_CHANNEL_ID"))

@@ -26,7 +26,7 @@ from vote import build_vote_message
 
 
 def test_start_vote_posts_vote_message_and_starts_comment_thread(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     class PostMessageCall(TypedDict):
         channel_id: ChannelId
@@ -71,6 +71,7 @@ def test_start_vote_posts_vote_message_and_starts_comment_thread(
     monkeypatch.setattr(
         jobs, "start_thread_from_message", fake_start_thread_from_message
     )
+    caplog.set_level(logging.INFO, logger="jobs")
 
     start_vote("dummy-token", vote_channel_id, today)
 
@@ -86,6 +87,11 @@ def test_start_vote_posts_vote_message_and_starts_comment_thread(
     assert start_thread_from_message_call["message_id"] == vote_message_id
     assert start_thread_from_message_call["name"] == "11/30-12/6 💬コメント"
     assert start_thread_from_message_call["auto_archive_duration"] == 10080
+
+    assert caplog.messages == [
+        "Vote 3000: posted for 11/30-12/6",
+        "Vote 3000: started thread '11/30-12/6 💬コメント'",
+    ]
 
 
 type Call = tuple[object, ...]

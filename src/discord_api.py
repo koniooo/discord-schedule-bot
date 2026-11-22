@@ -32,10 +32,14 @@ GuildId = NewType("GuildId", str)
 class User(TypedDict):
     id: UserId
     bot: NotRequired[bool]
+    # Discord always sends these two; NotRequired keeps hand-built test users short.
+    username: NotRequired[str]
+    global_name: NotRequired[str | None]
 
 
 class GuildMember(TypedDict):
     user: User
+    nick: NotRequired[str | None]
 
 
 class Channel(TypedDict):

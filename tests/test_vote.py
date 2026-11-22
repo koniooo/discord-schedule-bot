@@ -25,6 +25,7 @@ from vote import (
     collect_voter_ids,
     find_latest_vote_message,
     format_comment_thread_name,
+    get_display_name,
     get_poll_expires_at,
     has_own_reaction,
     is_human,
@@ -328,3 +329,50 @@ def test_build_vote_channel_reminder_message_replies_to_vote_message() -> None:
         ),
         "message_reference": {"message_id": "3000"},
     }
+
+
+@pytest.mark.parametrize(
+    ("guild_member", "expected"),
+    [
+        pytest.param(
+            GuildMember(
+                nick="こにー",
+                user=User(id=UserId("4001"), global_name="こにお", username="cony"),
+            ),
+            "こにー",
+            id="nickname",
+        ),
+        pytest.param(
+            GuildMember(
+                nick=None,
+                user=User(id=UserId("4001"), global_name="こにお", username="cony"),
+            ),
+            "こにお",
+            id="global_name",
+        ),
+        pytest.param(
+            GuildMember(
+                nick=None,
+                user=User(id=UserId("4001"), global_name=None, username="cony"),
+            ),
+            "cony",
+            id="username",
+        ),
+        # Discord leaves out "nick" for members without one, so missing keys
+        # must be skipped like None values.
+        pytest.param(
+            GuildMember(user=User(id=UserId("4001"), username="cony")),
+            "cony",
+            id="username_when_nick_and_global_name_are_missing",
+        ),
+        pytest.param(
+            GuildMember(nick=None, user=User(id=UserId("4001"), global_name=None)),
+            "4001",
+            id="user_id",
+        ),
+    ],
+)
+def test_get_display_name_prefers_nick_then_global_name_then_username(
+    guild_member: GuildMember, expected: str
+) -> None:
+    assert get_display_name(guild_member) == expected

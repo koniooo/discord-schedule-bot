@@ -158,3 +158,18 @@ def build_vote_channel_reminder_message(
         content=content,
         message_reference={"message_id": vote_message_id},
     )
+
+
+def get_display_name(guild_member: GuildMember) -> str:
+    """Return the name shown in the server.
+
+    Tries nick, then global name, then username, and falls back to the id.
+    """
+    user = guild_member["user"]
+    if "nick" in guild_member and guild_member["nick"] is not None:
+        return guild_member["nick"]
+    if "global_name" in user and user["global_name"] is not None:
+        return user["global_name"]
+    if "username" in user:
+        return user["username"]
+    return user["id"]

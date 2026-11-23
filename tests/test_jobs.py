@@ -101,7 +101,7 @@ POLL_EXPIRES_AT = datetime(2026, 11, 24, 3, 0, tzinfo=UTC)
 
 
 def make_discord_api_error(
-    status: int, reason: str, discord_code: int | None
+    status: int, reason: str, discord_code: int | None, message: str | None
 ) -> DiscordApiError:
     return DiscordApiError(
         method="POST",
@@ -109,7 +109,7 @@ def make_discord_api_error(
         status=status,
         reason=reason,
         discord_code=discord_code,
-        message=None,
+        message=message,
         body=b"",
     )
 
@@ -364,7 +364,9 @@ def test_report_if_all_voted_does_not_mark_vote_when_dm_fails(
         AnswerId(1): [{"id": UserId("4001")}, {"id": UserId("4002")}]
     }
     fake_discord.post_message_errors = {
-        ChannelId("2001"): make_discord_api_error(500, "Internal Server Error", None)
+        ChannelId("2001"): make_discord_api_error(
+            500, "Internal Server Error", None, None
+        )
     }
 
     with pytest.raises(DiscordApiError):
@@ -403,9 +405,9 @@ def test_send_reminders_dms_each_human_non_voter(
         assert (
             "https://discord.com/channels/1001/2000/3000" in reminder_message["content"]
         )
+    # Nobody failed, so the "not sent to" part is left out.
     assert (
-        "Vote 3000 (11/30-12/6): sent 2/2 reminder DMs; sent to: ['Alice', 'bob']; "
-        "cannot send to: []; no mutual guilds with: []; failed for: []"
+        "Vote 3000 (11/30-12/6): sent 2/2 reminder DMs; sent to: Alice, bob"
         in caplog.messages
     )
     # Every DM worked, so there is no reply in the vote channel to log.
@@ -449,15 +451,15 @@ def test_send_reminders_warns_when_poll_is_closed(
     [
         pytest.param(
             50007,
-            "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: ['bob']; "
-            "cannot send to: ['Alice']; no mutual guilds with: []; failed for: []",
+            "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: bob; "
+            "not sent to: Alice (403 Forbidden / Discord code 50007)",
             id="cannot_send_messages_to_user",
         ),
         # Seen on the real server when a member turned off DMs for the server.
         pytest.param(
             50278,
-            "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: ['bob']; "
-            "cannot send to: []; no mutual guilds with: ['Alice']; failed for: []",
+            "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: bob; "
+            "not sent to: Alice (403 Forbidden / Discord code 50278)",
             id="no_mutual_guilds",
         ),
     ],
@@ -470,7 +472,7 @@ def test_send_reminders_replies_in_vote_channel_when_a_dm_is_closed(
 ) -> None:
     # The first member's DMs are closed, so the second member proves the loop goes on.
     fake_discord.post_message_errors = {
-        ChannelId("2101"): make_discord_api_error(403, "Forbidden", discord_code)
+        ChannelId("2101"): make_discord_api_error(403, "Forbidden", discord_code, None)
     }
     caplog.set_level(logging.INFO, logger="jobs")
 
@@ -484,7 +486,7 @@ def test_send_reminders_replies_in_vote_channel_when_a_dm_is_closed(
     assert vote_channel_reminder_message.get("message_reference") == {
         "message_id": "3000"
     }
-    # The summary tells the two codes apart, and the reply is logged after it.
+    # Closed DMs are not errors: no failure line, only the summary and then the reply.
     assert caplog.messages == [
         expected_summary,
         "Vote 3000 (11/30-12/6): posted a reminder in the vote channel",
@@ -495,8 +497,10 @@ def test_send_reminders_logs_the_channel_reply_only_after_posting_it(
     fake_discord: FakeDiscord, caplog: pytest.LogCaptureFixture
 ) -> None:
     fake_discord.post_message_errors = {
-        ChannelId("2101"): make_discord_api_error(403, "Forbidden", 50007),
-        ChannelId("2000"): make_discord_api_error(500, "Internal Server Error", None),
+        ChannelId("2101"): make_discord_api_error(403, "Forbidden", 50007, None),
+        ChannelId("2000"): make_discord_api_error(
+            500, "Internal Server Error", None, None
+        ),
     }
     caplog.set_level(logging.INFO, logger="jobs")
 
@@ -505,31 +509,44 @@ def test_send_reminders_logs_the_channel_reply_only_after_posting_it(
 
     # The summary is logged before the reply, so it survives the failed post.
     assert caplog.messages == [
-        "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: ['bob']; "
-        "cannot send to: ['Alice']; no mutual guilds with: []; failed for: []"
+        "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: bob; "
+        "not sent to: Alice (403 Forbidden / Discord code 50007)"
     ]
 
 
 def test_send_reminders_replies_once_when_several_dms_fail(
-    fake_discord: FakeDiscord,
+    fake_discord: FakeDiscord, caplog: pytest.LogCaptureFixture
 ) -> None:
     # One closed DM and one other error: both kinds lead to the same single reply.
     fake_discord.post_message_errors = {
-        ChannelId("2101"): make_discord_api_error(403, "Forbidden", 50007),
-        ChannelId("2102"): make_discord_api_error(500, "Internal Server Error", None),
+        ChannelId("2101"): make_discord_api_error(
+            403, "Forbidden", 50007, "Cannot send messages to this user"
+        ),
+        ChannelId("2102"): make_discord_api_error(
+            500, "Internal Server Error", None, None
+        ),
     }
+    caplog.set_level(logging.INFO, logger="jobs")
 
     run_send_reminders(POLL_EXPIRES_AT - timedelta(days=1))
 
     # One reply for all failed DMs, not one per member.
     assert [channel_id for channel_id, _ in fake_discord.posted_messages] == ["2000"]
+    # Nobody got a DM, so the "sent to" part is left out.
+    assert (
+        "Vote 3000 (11/30-12/6): sent 0/2 reminder DMs; not sent to: "
+        "Alice (403 Forbidden / Discord code 50007: Cannot send messages to this user), "
+        "bob (500 Internal Server Error / no Discord code)" in caplog.messages
+    )
 
 
 def test_send_reminders_continues_after_other_dm_errors(
     fake_discord: FakeDiscord, caplog: pytest.LogCaptureFixture
 ) -> None:
     fake_discord.post_message_errors = {
-        ChannelId("2101"): make_discord_api_error(500, "Internal Server Error", None)
+        ChannelId("2101"): make_discord_api_error(
+            500, "Internal Server Error", None, None
+        )
     }
     caplog.set_level(logging.INFO, logger="jobs")
 
@@ -549,8 +566,8 @@ def test_send_reminders_continues_after_other_dm_errors(
     # logger.exception keeps the traceback, so the cause can be found in the logs.
     assert failure_record.exc_info is not None
     assert (
-        "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: ['bob']; "
-        "cannot send to: []; no mutual guilds with: []; failed for: ['Alice']"
+        "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: bob; "
+        "not sent to: Alice (500 Internal Server Error / no Discord code)"
         in caplog.messages
     )
     assert (

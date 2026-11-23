@@ -15,6 +15,7 @@ from discord_api import (
     UserId,
     add_reaction,
     create_dm_channel,
+    format_error_details,
     get_answer_voters,
     get_channel_messages,
     get_current_user,
@@ -210,9 +211,7 @@ def send_reminders(
         return
 
     dm_sent_members: list[GuildMember] = []
-    dm_cannot_send_members: list[GuildMember] = []
-    dm_no_mutual_guild_members: list[GuildMember] = []
-    dm_failed_members: list[GuildMember] = []
+    dm_failures: list[tuple[GuildMember, DiscordApiError]] = []
     dm_reminder_message = build_dm_reminder_message(
         guild_id, channel_id, vote_message_id, poll_expires_at
     )
@@ -221,35 +220,41 @@ def send_reminders(
         try:
             _send_dm(token, human_non_voter["user"]["id"], dm_reminder_message)
         except DiscordApiError as error:
-            if error.discord_code == CANNOT_SEND_MESSAGES_TO_USER:
-                dm_cannot_send_members.append(human_non_voter)
-            elif error.discord_code == CANNOT_SEND_MESSAGES_TO_USER_NO_MUTUAL_GUILDS:
-                dm_no_mutual_guild_members.append(human_non_voter)
-            else:
+            dm_failures.append((human_non_voter, error))
+            # Closed DMs are the member's choice; any other error is a problem.
+            if error.discord_code not in (
+                CANNOT_SEND_MESSAGES_TO_USER,
+                CANNOT_SEND_MESSAGES_TO_USER_NO_MUTUAL_GUILDS,
+            ):
                 logger.exception(
                     "Vote %s (%s): failed to send a reminder DM to %s",
                     vote_message_id,
                     vote_label,
                     get_display_name(human_non_voter),
                 )
-                dm_failed_members.append(human_non_voter)
         else:
             dm_sent_members.append(human_non_voter)
 
+    member_parts: list[str] = []
+    if dm_sent_members:
+        sent_names = ", ".join(get_display_name(member) for member in dm_sent_members)
+        member_parts.append(f"sent to: {sent_names}")
+    if dm_failures:
+        failures = ", ".join(
+            f"{get_display_name(member)} ({format_error_details(error)})"
+            for member, error in dm_failures
+        )
+        member_parts.append(f"not sent to: {failures}")
     logger.info(
-        "Vote %s (%s): sent %d/%d reminder DMs; sent to: %s; cannot send to: %s; "
-        "no mutual guilds with: %s; failed for: %s",
+        "Vote %s (%s): sent %d/%d reminder DMs; %s",
         vote_message_id,
         vote_label,
         len(dm_sent_members),
         len(human_non_voters),
-        [get_display_name(member) for member in dm_sent_members],
-        [get_display_name(member) for member in dm_cannot_send_members],
-        [get_display_name(member) for member in dm_no_mutual_guild_members],
-        [get_display_name(member) for member in dm_failed_members],
+        "; ".join(member_parts),
     )
 
-    if dm_cannot_send_members or dm_no_mutual_guild_members or dm_failed_members:
+    if dm_failures:
         vote_channel_reminder_message = build_vote_channel_reminder_message(
             vote_message_id, poll_expires_at
         )

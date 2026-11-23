@@ -20,6 +20,7 @@ from discord_api import (
     add_reaction,
     build_request,
     create_dm_channel,
+    format_error_details,
     get_answer_voters,
     get_channel_messages,
     get_current_user,
@@ -264,6 +265,66 @@ def test_post_message_keeps_http_error_as_cause(fake_urlopen: FakeUrlopen) -> No
         post_message("dummy-token", ChannelId("2000"), {"content": ""})
 
     assert caught.value.__cause__ is http_error
+
+
+def make_discord_api_error(
+    status: int, reason: str, discord_code: int | None, message: str | None
+) -> DiscordApiError:
+    return DiscordApiError(
+        method="POST",
+        path="/api/v10/channels/2000/messages",
+        status=status,
+        reason=reason,
+        discord_code=discord_code,
+        message=message,
+        body=b"",
+    )
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        pytest.param(
+            make_discord_api_error(
+                403, "Forbidden", 50007, "Cannot send messages to this user"
+            ),
+            "403 Forbidden / Discord code 50007: Cannot send messages to this user",
+            id="code_and_message",
+        ),
+        pytest.param(
+            make_discord_api_error(403, "Forbidden", 50007, None),
+            "403 Forbidden / Discord code 50007",
+            id="code_only",
+        ),
+        pytest.param(
+            make_discord_api_error(
+                429, "Too Many Requests", None, "You are being rate limited."
+            ),
+            "429 Too Many Requests / no Discord code: You are being rate limited.",
+            id="message_only",
+        ),
+        pytest.param(
+            make_discord_api_error(500, "Internal Server Error", None, None),
+            "500 Internal Server Error / no Discord code",
+            id="no_code_and_no_message",
+        ),
+        # Code 0 is falsy, so it must not be shown as "no Discord code".
+        pytest.param(
+            make_discord_api_error(400, "Bad Request", 0, "General error"),
+            "400 Bad Request / Discord code 0: General error",
+            id="code_zero",
+        ),
+        pytest.param(
+            make_discord_api_error(403, "", 50007, None),
+            "403 / Discord code 50007",
+            id="empty_reason",
+        ),
+    ],
+)
+def test_format_error_details_shows_http_status_and_discord_details(
+    error: DiscordApiError, expected: str
+) -> None:
+    assert format_error_details(error) == expected
 
 
 def test_get_current_user_builds_request(fake_urlopen: FakeUrlopen) -> None:

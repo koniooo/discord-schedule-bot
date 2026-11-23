@@ -209,6 +209,20 @@ class DiscordApiError(Exception):
         self.body = body
 
 
+def format_error_details(error: DiscordApiError) -> str:
+    """Return the status and Discord's error details on one line.
+
+    e.g. "403 Forbidden / Discord code 50007: Cannot send messages to this user"
+    """
+    status_line = f"{error.status} {error.reason}".rstrip()
+    if error.discord_code is not None:
+        code = f"Discord code {error.discord_code}"
+    else:
+        code = "no Discord code"
+    message_part = f": {error.message}" if error.message is not None else ""
+    return f"{status_line} / {code}{message_part}"
+
+
 def _send(request: Request) -> bytes:
     """Send the request to Discord and return the raw response body.
 

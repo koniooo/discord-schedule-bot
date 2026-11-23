@@ -449,6 +449,7 @@ def test_send_reminders_warns_when_poll_is_closed(
 @pytest.mark.parametrize(
     ("discord_code", "expected_summary"),
     [
+        # Seen on the real server when a member blocked the bot.
         pytest.param(
             50007,
             "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: bob; "

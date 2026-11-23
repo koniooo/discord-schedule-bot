@@ -174,6 +174,7 @@ class DiscordApiError(Exception):
 
     Attributes:
         status: The HTTP status code, e.g. 403.
+        reason: The HTTP reason phrase, e.g. "Forbidden".
         discord_code: Discord's JSON error code, e.g. 50007, or None.
         message: Discord's error message, or None.
         body: The raw response body.
@@ -202,6 +203,7 @@ class DiscordApiError(Exception):
 
         super().__init__(summary)
         self.status = status
+        self.reason = reason
         self.discord_code = discord_code
         self.message = message
         self.body = body

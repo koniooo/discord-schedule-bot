@@ -250,6 +250,7 @@ def test_post_message_raises_discord_api_error_with_details(
 
     error = caught.value
     assert error.status == 403
+    assert error.reason == "Forbidden"
     assert error.discord_code == 50007
     assert error.message == "Cannot send messages to this user"
     assert error.body == body

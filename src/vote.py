@@ -76,21 +76,23 @@ def collect_voter_ids(voters_per_answer: list[list[User]]) -> set[UserId]:
     return voter_ids
 
 
-def is_human(user: User) -> bool:
-    return not user.get("bot", False)
+def is_human(guild_member: GuildMember) -> bool:
+    return not guild_member["user"].get("bot", False)
 
 
-def collect_human_non_voter_ids(
+def collect_human_non_voters(
     guild_members: list[GuildMember], voter_ids: set[UserId]
-) -> list[UserId]:
-    """Return the ids of human members who have not voted, in member order."""
+) -> list[GuildMember]:
+    """Return the human members who have not voted, in member order."""
 
-    def is_human_non_voter(user: User) -> bool:
-        return is_human(user) and user["id"] not in voter_ids
+    def is_human_non_voter(guild_member: GuildMember) -> bool:
+        return is_human(guild_member) and guild_member["user"]["id"] not in voter_ids
 
-    users = [guild_member["user"] for guild_member in guild_members]
-
-    return [user["id"] for user in users if is_human_non_voter(user)]
+    return [
+        guild_member
+        for guild_member in guild_members
+        if is_human_non_voter(guild_member)
+    ]
 
 
 def has_own_reaction(message: Message, emoji: str) -> bool:

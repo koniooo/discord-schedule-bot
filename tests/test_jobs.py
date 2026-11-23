@@ -145,8 +145,10 @@ class FakeDiscord:
         self.voters_by_answer_id: dict[AnswerId, list[User]] = {}
         self.members: list[GuildMember] = [
             {"user": {"id": UserId("4000"), "bot": True}},
-            {"user": {"id": UserId("4001")}},
-            {"user": {"id": UserId("4002")}},
+            # Names let the tests check that logs show display names, not ids.
+            # 4001's nick differs from the username, so the logs must use the nick.
+            {"nick": "Alice", "user": {"id": UserId("4001"), "username": "alice"}},
+            {"user": {"id": UserId("4002"), "username": "bob"}},
         ]
         # One DM channel per user, so a test can make the DM to one user fail.
         self.dm_channel_ids: dict[UserId, ChannelId] = {
@@ -402,7 +404,7 @@ def test_send_reminders_dms_each_human_non_voter(
             "https://discord.com/channels/1001/2000/3000" in reminder_message["content"]
         )
     assert (
-        "Vote 3000 (11/30-12/6): sent 2/2 reminder DMs; sent to: ['4001', '4002']; "
+        "Vote 3000 (11/30-12/6): sent 2/2 reminder DMs; sent to: ['Alice', 'bob']; "
         "cannot send to: []; no mutual guilds with: []; failed for: []"
         in caplog.messages
     )
@@ -447,15 +449,15 @@ def test_send_reminders_warns_when_poll_is_closed(
     [
         pytest.param(
             50007,
-            "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: ['4002']; "
-            "cannot send to: ['4001']; no mutual guilds with: []; failed for: []",
+            "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: ['bob']; "
+            "cannot send to: ['Alice']; no mutual guilds with: []; failed for: []",
             id="cannot_send_messages_to_user",
         ),
         # Seen on the real server when a member turned off DMs for the server.
         pytest.param(
             50278,
-            "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: ['4002']; "
-            "cannot send to: []; no mutual guilds with: ['4001']; failed for: []",
+            "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: ['bob']; "
+            "cannot send to: []; no mutual guilds with: ['Alice']; failed for: []",
             id="no_mutual_guilds",
         ),
     ],
@@ -503,8 +505,8 @@ def test_send_reminders_logs_the_channel_reply_only_after_posting_it(
 
     # The summary is logged before the reply, so it survives the failed post.
     assert caplog.messages == [
-        "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: ['4002']; "
-        "cannot send to: ['4001']; no mutual guilds with: []; failed for: []"
+        "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: ['bob']; "
+        "cannot send to: ['Alice']; no mutual guilds with: []; failed for: []"
     ]
 
 
@@ -542,13 +544,13 @@ def test_send_reminders_continues_after_other_dm_errors(
         record
         for record in caplog.records
         if record.getMessage()
-        == "Vote 3000 (11/30-12/6): failed to send a reminder DM to 4001"
+        == "Vote 3000 (11/30-12/6): failed to send a reminder DM to Alice"
     ]
     # logger.exception keeps the traceback, so the cause can be found in the logs.
     assert failure_record.exc_info is not None
     assert (
-        "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: ['4002']; "
-        "cannot send to: []; no mutual guilds with: []; failed for: ['4001']"
+        "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: ['bob']; "
+        "cannot send to: []; no mutual guilds with: []; failed for: ['Alice']"
         in caplog.messages
     )
     assert (

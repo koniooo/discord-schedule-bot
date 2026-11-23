@@ -21,7 +21,7 @@ from vote import (
     build_poll_answers,
     build_vote_channel_reminder_message,
     build_vote_message,
-    collect_human_non_voter_ids,
+    collect_human_non_voters,
     collect_voter_ids,
     find_latest_vote_message,
     format_comment_thread_name,
@@ -190,7 +190,10 @@ def test_collect_voter_ids_returns_ids_of_all_voters(
                 {"user": {"id": "4003"}},
             ],
             {"4002"},
-            ["4001", "4003"],
+            [
+                {"user": {"id": "4001"}},
+                {"user": {"id": "4003"}},
+            ],
             id="ignores_bot",
         ),
         pytest.param(
@@ -212,15 +215,18 @@ def test_collect_voter_ids_returns_ids_of_all_voters(
                 {"user": {"id": "4002"}},
             ],
             {"4002"},
-            ["4003", "4001"],
+            [
+                {"user": {"id": "4003"}},
+                {"user": {"id": "4001"}},
+            ],
             id="keeps_member_order",
         ),
     ],
 )
-def test_collect_human_non_voter_ids_excludes_bots_and_voters(
-    members: list[GuildMember], voter_ids: set[UserId], expected: list[UserId]
+def test_collect_human_non_voters_excludes_bots_and_voters(
+    members: list[GuildMember], voter_ids: set[UserId], expected: list[GuildMember]
 ) -> None:
-    assert collect_human_non_voter_ids(members, voter_ids) == expected
+    assert collect_human_non_voters(members, voter_ids) == expected
 
 
 @pytest.mark.parametrize(
@@ -293,15 +299,23 @@ def test_get_poll_expires_at_raises_when_poll_has_no_expiry() -> None:
 
 
 @pytest.mark.parametrize(
-    ("user", "expected"),
+    ("guild_member", "expected"),
     [
-        pytest.param(User(id=UserId("4001")), True, id="bot_key_missing"),
-        pytest.param(User(id=UserId("4001"), bot=False), True, id="bot_false"),
-        pytest.param(User(id=UserId("4000"), bot=True), False, id="bot_true"),
+        pytest.param(
+            GuildMember(user=User(id=UserId("4001"))), True, id="bot_key_missing"
+        ),
+        pytest.param(
+            GuildMember(user=User(id=UserId("4001"), bot=False)), True, id="bot_false"
+        ),
+        pytest.param(
+            GuildMember(user=User(id=UserId("4000"), bot=True)), False, id="bot_true"
+        ),
     ],
 )
-def test_is_human_returns_whether_user_is_human(user: User, expected: bool) -> None:
-    assert is_human(user) == expected
+def test_is_human_returns_whether_member_is_human(
+    guild_member: GuildMember, expected: bool
+) -> None:
+    assert is_human(guild_member) == expected
 
 
 def test_build_dm_reminder_message_shows_jst_deadline_and_vote_link() -> None:

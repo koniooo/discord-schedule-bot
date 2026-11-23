@@ -7,6 +7,7 @@ from discord_api import (
     ChannelId,
     DiscordApiError,
     GuildId,
+    GuildMember,
     Message,
     MessageCreateRequest,
     MessageId,
@@ -31,10 +32,11 @@ from vote import (
     build_dm_reminder_message,
     build_vote_channel_reminder_message,
     build_vote_message,
-    collect_human_non_voter_ids,
+    collect_human_non_voters,
     collect_voter_ids,
     find_latest_vote_message,
     format_comment_thread_name,
+    get_display_name,
     get_poll_expires_at,
     has_own_reaction,
     is_human,
@@ -134,13 +136,13 @@ def report_if_all_voted(
 
     voter_ids = _fetch_voter_ids(token, channel_id, vote_message_id, poll)
     guild_members = list_guild_members(token, guild_id)
-    human_non_voter_ids = collect_human_non_voter_ids(guild_members, voter_ids)
 
+    human_non_voters = collect_human_non_voters(guild_members, voter_ids)
     human_members = [
-        guild_member for guild_member in guild_members if is_human(guild_member["user"])
+        guild_member for guild_member in guild_members if is_human(guild_member)
     ]
     human_member_count = len(human_members)
-    voted_count = human_member_count - len(human_non_voter_ids)
+    voted_count = human_member_count - len(human_non_voters)
 
     logger.info(
         "Vote %s (%s): %d/%d members have voted",
@@ -150,7 +152,7 @@ def report_if_all_voted(
         human_member_count,
     )
 
-    if human_non_voter_ids:
+    if human_non_voters:
         return
 
     all_voted_report_message = build_all_voted_report_message(
@@ -197,8 +199,9 @@ def send_reminders(
 
     voter_ids = _fetch_voter_ids(token, channel_id, vote_message_id, poll)
     guild_members = list_guild_members(token, guild_id)
-    human_non_voter_ids = collect_human_non_voter_ids(guild_members, voter_ids)
-    if not human_non_voter_ids:
+
+    human_non_voters = collect_human_non_voters(guild_members, voter_ids)
+    if not human_non_voters:
         logger.info(
             "Vote %s (%s): everyone has voted; no reminders needed",
             vote_message_id,
@@ -206,46 +209,47 @@ def send_reminders(
         )
         return
 
-    dm_sent_ids: list[UserId] = []
-    dm_cannot_send_ids: list[UserId] = []
-    dm_no_mutual_guild_ids: list[UserId] = []
-    dm_failed_ids: list[UserId] = []
+    dm_sent_members: list[GuildMember] = []
+    dm_cannot_send_members: list[GuildMember] = []
+    dm_no_mutual_guild_members: list[GuildMember] = []
+    dm_failed_members: list[GuildMember] = []
     dm_reminder_message = build_dm_reminder_message(
         guild_id, channel_id, vote_message_id, poll_expires_at
     )
-    for human_non_voter_id in human_non_voter_ids:
+
+    for human_non_voter in human_non_voters:
         try:
-            _send_dm(token, human_non_voter_id, dm_reminder_message)
+            _send_dm(token, human_non_voter["user"]["id"], dm_reminder_message)
         except DiscordApiError as error:
             if error.discord_code == CANNOT_SEND_MESSAGES_TO_USER:
-                dm_cannot_send_ids.append(human_non_voter_id)
+                dm_cannot_send_members.append(human_non_voter)
             elif error.discord_code == CANNOT_SEND_MESSAGES_TO_USER_NO_MUTUAL_GUILDS:
-                dm_no_mutual_guild_ids.append(human_non_voter_id)
+                dm_no_mutual_guild_members.append(human_non_voter)
             else:
                 logger.exception(
                     "Vote %s (%s): failed to send a reminder DM to %s",
                     vote_message_id,
                     vote_label,
-                    human_non_voter_id,
+                    get_display_name(human_non_voter),
                 )
-                dm_failed_ids.append(human_non_voter_id)
+                dm_failed_members.append(human_non_voter)
         else:
-            dm_sent_ids.append(human_non_voter_id)
+            dm_sent_members.append(human_non_voter)
 
     logger.info(
         "Vote %s (%s): sent %d/%d reminder DMs; sent to: %s; cannot send to: %s; "
         "no mutual guilds with: %s; failed for: %s",
         vote_message_id,
         vote_label,
-        len(dm_sent_ids),
-        len(human_non_voter_ids),
-        dm_sent_ids,
-        dm_cannot_send_ids,
-        dm_no_mutual_guild_ids,
-        dm_failed_ids,
+        len(dm_sent_members),
+        len(human_non_voters),
+        [get_display_name(member) for member in dm_sent_members],
+        [get_display_name(member) for member in dm_cannot_send_members],
+        [get_display_name(member) for member in dm_no_mutual_guild_members],
+        [get_display_name(member) for member in dm_failed_members],
     )
 
-    if dm_cannot_send_ids or dm_no_mutual_guild_ids or dm_failed_ids:
+    if dm_cannot_send_members or dm_no_mutual_guild_members or dm_failed_members:
         vote_channel_reminder_message = build_vote_channel_reminder_message(
             vote_message_id, poll_expires_at
         )

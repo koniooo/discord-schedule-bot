@@ -175,3 +175,29 @@ def get_display_name(guild_member: GuildMember) -> str:
     if "username" in user:
         return user["username"]
     return user["id"]
+
+
+def build_deadline_report_message(
+    human_member_count: int,
+    human_non_voter_ids: list[UserId],
+    guild_id: GuildId,
+    thread_id: ChannelId,
+) -> MessageCreateRequest:
+    human_non_voter_count = len(human_non_voter_ids)
+    human_voter_count = human_member_count - human_non_voter_count
+    summary = (
+        f"{human_member_count}人全員が投票したクポ。"
+        if human_non_voter_count == 0
+        else f"{human_voter_count}/{human_member_count}人が投票したクポ。"
+    )
+    mentions = " ".join([f"<@{non_voter_id}>" for non_voter_id in human_non_voter_ids])
+    non_voter_ids_text = f"\n\n以下のメンバーが未投票だったクポ。\n{mentions}"
+
+    content = (
+        "投票が締め切られたクポ～\n"
+        f"{summary}\n"
+        f"https://discord.com/channels/{guild_id}/{thread_id}"
+        f"{non_voter_ids_text if human_non_voter_count != 0 else ''}"
+    )
+
+    return MessageCreateRequest(content=content)

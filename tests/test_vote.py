@@ -8,6 +8,7 @@ from discord_api import (
     GuildId,
     GuildMember,
     Message,
+    MessageCreateRequest,
     MessageId,
     PollResponse,
     Reaction,
@@ -17,6 +18,7 @@ from discord_api import (
 from vote import (
     VOTE_ANNOUNCEMENT_TEXT,
     build_all_voted_report_message,
+    build_deadline_report_message,
     build_dm_reminder_message,
     build_poll_answers,
     build_vote_channel_reminder_message,
@@ -390,3 +392,40 @@ def test_get_display_name_prefers_nick_then_global_name_then_username(
     guild_member: GuildMember, expected: str
 ) -> None:
     assert get_display_name(guild_member) == expected
+
+
+@pytest.mark.parametrize(
+    ("human_non_voter_ids", "expected"),
+    [
+        pytest.param(
+            [],
+            {
+                "content": "投票が締め切られたクポ～\n"
+                "8人全員が投票したクポ。\n"
+                "https://discord.com/channels/1000/2000"
+            },
+            id="everyone_voted",
+        ),
+        pytest.param(
+            [UserId("4000"), UserId("4002"), UserId("4005")],
+            {
+                "content": "投票が締め切られたクポ～\n"
+                "5/8人が投票したクポ。\n"
+                "https://discord.com/channels/1000/2000\n"
+                "\n"
+                "以下のメンバーが未投票だったクポ。\n"
+                "<@4000> <@4002> <@4005>"
+            },
+            id="some_members_did_not_vote",
+        ),
+    ],
+)
+def test_build_deadline_report_message_shows_count_link_and_non_voters(
+    human_non_voter_ids: list[UserId], expected: MessageCreateRequest
+) -> None:
+    assert (
+        build_deadline_report_message(
+            8, human_non_voter_ids, GuildId("1000"), ChannelId("2000")
+        )
+        == expected
+    )

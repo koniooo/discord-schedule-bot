@@ -131,7 +131,10 @@ def make_vote_message(
     if reactions is not None:
         vote_message["reactions"] = reactions
     if has_thread:
-        vote_message["thread"] = {"name": "11/30-12/6 💬コメント"}
+        vote_message["thread"] = {
+            "name": "11/30-12/6 💬コメント",
+            "thread_metadata": {"archived": False, "locked": False},
+        }
     return vote_message
 
 

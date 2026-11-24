@@ -46,8 +46,14 @@ class Channel(TypedDict):
     id: ChannelId
 
 
+class ThreadMetadata(TypedDict):
+    archived: bool
+    locked: bool
+
+
 class Thread(TypedDict):
     name: str
+    thread_metadata: ThreadMetadata
 
 
 # Minutes of inactivity before Discord archives a thread: 1 hour, 1 day, 3 days, 7 days.

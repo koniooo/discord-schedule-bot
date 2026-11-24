@@ -26,6 +26,7 @@ from discord_api import (
     get_current_user,
     get_thread_id_started_from,
     list_guild_members,
+    modify_thread,
     parse_error_body,
     post_message,
     start_thread_from_message,
@@ -438,6 +439,25 @@ def test_post_message_returns_created_message(fake_urlopen: FakeUrlopen) -> None
         "id": "3000",
         "content": "hello",
     }
+
+
+def test_modify_thread_builds_request(fake_urlopen: FakeUrlopen) -> None:
+    modify_thread("dummy-token", ChannelId("2000"), locked=True, archived=False)
+
+    assert len(fake_urlopen.requests) == 1
+    request = fake_urlopen.requests[0]
+    assert request.method == "PATCH"
+    assert request.full_url == "https://discord.com/api/v10/channels/2000"
+    assert request.get_header("Authorization") == "Bot dummy-token"
+    assert request.data == b'{"locked": true, "archived": false}'
+
+
+def test_modify_thread_returns_channel(fake_urlopen: FakeUrlopen) -> None:
+    fake_urlopen.response = b'{"id": "2000"}'
+
+    assert modify_thread(
+        "dummy-token", ChannelId("2000"), locked=True, archived=True
+    ) == {"id": "2000"}
 
 
 def test_add_reaction_builds_request(fake_urlopen: FakeUrlopen) -> None:

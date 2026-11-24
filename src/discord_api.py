@@ -20,7 +20,7 @@ USER_AGENT = "DiscordBot (https://github.com/koniooo/discord-schedule-bot, 0.1.0
 CANNOT_SEND_MESSAGES_TO_USER = 50007
 CANNOT_SEND_MESSAGES_TO_USER_NO_MUTUAL_GUILDS = 50278
 
-type HttpMethod = Literal["GET", "POST", "PUT"]
+type HttpMethod = Literal["GET", "POST", "PUT", "PATCH"]
 
 UserId = NewType("UserId", str)
 ChannelId = NewType("ChannelId", str)
@@ -116,7 +116,7 @@ def build_request(
 ) -> Request: ...
 @overload
 def build_request(
-    method: Literal["POST"], path: str, token: str, body: Mapping[str, Any]
+    method: Literal["POST", "PATCH"], path: str, token: str, body: Mapping[str, Any]
 ) -> Request: ...
 def build_request(
     method: HttpMethod, path: str, token: str, body: Mapping[str, Any] | None = None
@@ -278,6 +278,19 @@ def post_message(
 ) -> Message:
     """POST https://discord.com/api/v10/channels/{channel_id}/messages"""
     request = build_request("POST", f"/channels/{channel_id}/messages", token, body)
+    return json.loads(_send(request))
+
+
+def modify_thread(
+    token: str, thread_id: ChannelId, *, locked: bool, archived: bool
+) -> Channel:
+    """PATCH https://discord.com/api/v10/channels/{thread_id}"""
+    request = build_request(
+        "PATCH",
+        f"/channels/{thread_id}",
+        token,
+        {"locked": locked, "archived": archived},
+    )
     return json.loads(_send(request))
 
 

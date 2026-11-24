@@ -37,6 +37,8 @@ from vote import (
     collect_voter_ids,
     find_latest_vote_message,
     format_comment_thread_name,
+    format_message_url,
+    format_thread_url,
     get_display_name,
     get_poll_expires_at,
     has_own_reaction,
@@ -158,8 +160,7 @@ def report_if_all_voted(
 
     all_voted_report_message = build_all_voted_report_message(
         human_member_count,
-        guild_id,
-        get_thread_id_started_from(vote_message_id),
+        format_thread_url(guild_id, get_thread_id_started_from(vote_message_id)),
         poll_expires_at,
     )
     _send_dm(token, master_user_id, all_voted_report_message)
@@ -213,7 +214,7 @@ def send_reminders(
     dm_sent_members: list[GuildMember] = []
     dm_failures: list[tuple[GuildMember, DiscordApiError]] = []
     dm_reminder_message = build_dm_reminder_message(
-        guild_id, channel_id, vote_message_id, poll_expires_at
+        format_message_url(guild_id, channel_id, vote_message_id), poll_expires_at
     )
 
     for human_non_voter in human_non_voters:

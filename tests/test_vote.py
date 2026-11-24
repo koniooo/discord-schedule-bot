@@ -27,6 +27,8 @@ from vote import (
     collect_voter_ids,
     find_latest_vote_message,
     format_comment_thread_name,
+    format_message_url,
+    format_thread_url,
     get_display_name,
     get_poll_expires_at,
     has_own_reaction,
@@ -274,8 +276,7 @@ def test_has_own_reaction_returns_false_without_reactions() -> None:
 def test_build_all_voted_report_message_shows_count_link_and_jst_deadline() -> None:
     assert build_all_voted_report_message(
         8,
-        GuildId("1001"),
-        ChannelId("3000"),
+        "https://discord.com/channels/1001/3000",
         datetime(2026, 11, 24, 3, 0, tzinfo=UTC),
     ) == {
         "content": (
@@ -322,9 +323,7 @@ def test_is_human_returns_whether_member_is_human(
 
 def test_build_dm_reminder_message_shows_jst_deadline_and_vote_link() -> None:
     assert build_dm_reminder_message(
-        GuildId("1001"),
-        ChannelId("2000"),
-        MessageId("3000"),
+        "https://discord.com/channels/1001/2000/3000",
         datetime(2026, 11, 24, 3, 0, tzinfo=UTC),
     ) == {
         "content": (
@@ -425,7 +424,21 @@ def test_build_deadline_report_message_shows_count_link_and_non_voters(
 ) -> None:
     assert (
         build_deadline_report_message(
-            8, human_non_voter_ids, GuildId("1000"), ChannelId("2000")
+            8, human_non_voter_ids, "https://discord.com/channels/1000/2000"
         )
         == expected
+    )
+
+
+def test_format_message_url_links_to_message_in_channel() -> None:
+    assert (
+        format_message_url(GuildId("1000"), ChannelId("2000"), MessageId("3000"))
+        == "https://discord.com/channels/1000/2000/3000"
+    )
+
+
+def test_format_thread_url_links_to_thread() -> None:
+    assert (
+        format_thread_url(GuildId("1000"), ChannelId("2000"))
+        == "https://discord.com/channels/1000/2000"
     )

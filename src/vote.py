@@ -111,16 +111,25 @@ def get_poll_expires_at(poll: PollResponse) -> datetime:
     return datetime.fromisoformat(expiry)
 
 
+def format_message_url(
+    guild_id: GuildId, channel_id: ChannelId, message_id: MessageId
+) -> str:
+    return f"https://discord.com/channels/{guild_id}/{channel_id}/{message_id}"
+
+
+def format_thread_url(guild_id: GuildId, thread_id: ChannelId) -> str:
+    return f"https://discord.com/channels/{guild_id}/{thread_id}"
+
+
 def build_all_voted_report_message(
     human_member_count: int,
-    guild_id: GuildId,
-    thread_id: ChannelId,
+    url: str,
     poll_expires_at: datetime,
 ) -> MessageCreateRequest:
     expires_at_in_jst = poll_expires_at.astimezone(JST)
     content = (
         f"{human_member_count}人全員が投票したクポ～\n"
-        f"https://discord.com/channels/{guild_id}/{thread_id}\n"
+        f"{url}\n"
         "\n"
         f"ただ{format_date_with_weekday(expires_at_in_jst.date())}の"
         f"{expires_at_in_jst.hour}時までは投票し直せるから気をつけてクポ～"
@@ -139,16 +148,10 @@ def _format_reminder_text(poll_expires_at: datetime) -> str:
 
 
 def build_dm_reminder_message(
-    guild_id: GuildId,
-    channel_id: ChannelId,
-    vote_message_id: MessageId,
+    url: str,
     poll_expires_at: datetime,
 ) -> MessageCreateRequest:
-    content = (
-        f"{_format_reminder_text(poll_expires_at)}"
-        "\n"
-        f"https://discord.com/channels/{guild_id}/{channel_id}/{vote_message_id}"
-    )
+    content = f"{_format_reminder_text(poll_expires_at)}\n{url}"
     return MessageCreateRequest(content=content)
 
 
@@ -178,10 +181,7 @@ def get_display_name(guild_member: GuildMember) -> str:
 
 
 def build_deadline_report_message(
-    human_member_count: int,
-    human_non_voter_ids: list[UserId],
-    guild_id: GuildId,
-    thread_id: ChannelId,
+    human_member_count: int, human_non_voter_ids: list[UserId], url: str
 ) -> MessageCreateRequest:
     human_non_voter_count = len(human_non_voter_ids)
     human_voter_count = human_member_count - human_non_voter_count
@@ -196,7 +196,7 @@ def build_deadline_report_message(
     content = (
         "投票が締め切られたクポ～\n"
         f"{summary}\n"
-        f"https://discord.com/channels/{guild_id}/{thread_id}"
+        f"{url}"
         f"{non_voter_ids_text if human_non_voter_count != 0 else ''}"
     )
 

@@ -158,9 +158,19 @@ def report_if_all_voted(
     if human_non_voters:
         return
 
+    if "thread" in vote_message:
+        url = format_thread_url(guild_id, get_thread_id_started_from(vote_message_id))
+    else:
+        logger.warning(
+            "Vote %s (%s): linking to the vote message instead of the thread",
+            vote_message_id,
+            vote_label,
+        )
+        url = format_message_url(guild_id, channel_id, vote_message_id)
+
     all_voted_report_message = build_all_voted_report_message(
         human_member_count,
-        format_thread_url(guild_id, get_thread_id_started_from(vote_message_id)),
+        url,
         poll_expires_at,
     )
     _send_dm(token, master_user_id, all_voted_report_message)

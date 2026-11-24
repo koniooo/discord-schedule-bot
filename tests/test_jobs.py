@@ -283,7 +283,7 @@ def test_report_if_all_voted_logs_how_many_human_members_have_voted(
     assert "Vote 3000 (11/30-12/6): 1/2 members have voted" in caplog.messages
 
 
-def test_report_if_all_voted_still_reports_without_thread(
+def test_report_if_all_voted_links_to_vote_message_without_thread(
     fake_discord: FakeDiscord, caplog: pytest.LogCaptureFixture
 ) -> None:
     fake_discord.messages = [make_vote_message(has_thread=False)]
@@ -295,11 +295,18 @@ def test_report_if_all_voted_still_reports_without_thread(
     run_report_if_all_voted(POLL_EXPIRES_AT - timedelta(days=1))
 
     assert "Vote 3000 (no thread): 2/2 members have voted" in caplog.messages
+    assert (
+        "Vote 3000 (no thread): linking to the vote message instead of the thread"
+        in caplog.messages
+    )
     assert fake_discord.call_names()[-3:] == [
         "create_dm_channel",
         "post_message",
         "add_reaction",
     ]
+    assert len(fake_discord.posted_messages) == 1
+    report_content = fake_discord.posted_messages[0][1]["content"]
+    assert "https://discord.com/channels/1001/2000/3000" in report_content
 
 
 def test_report_if_all_voted_does_nothing_when_already_reported(

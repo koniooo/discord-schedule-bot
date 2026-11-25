@@ -1,6 +1,5 @@
 import logging
 from datetime import UTC, date, datetime, timedelta
-from typing import TypedDict
 
 import pytest
 
@@ -22,77 +21,7 @@ from discord_api import (
 )
 from jobs import close_vote, report_if_all_voted, send_reminders, start_vote
 from schedule import get_monday_to_sunday_after_next
-from vote import build_vote_message
-
-
-def test_start_vote_posts_vote_message_and_starts_comment_thread(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    class PostMessageCall(TypedDict):
-        channel_id: ChannelId
-        body: MessageCreateRequest
-
-    class StartThreadFromMessageCall(TypedDict):
-        channel_id: ChannelId
-        message_id: MessageId
-        name: str
-        auto_archive_duration: AutoArchiveDuration
-
-    post_message_calls: list[PostMessageCall] = []
-    start_thread_from_message_calls: list[StartThreadFromMessageCall] = []
-    vote_message_id = MessageId("3000")
-    vote_channel_id = ChannelId("2000")
-    today = date(2026, 11, 16)
-
-    def fake_post_message(
-        _token: str, channel_id: ChannelId, body: MessageCreateRequest
-    ) -> Message:
-        post_message_calls.append({"channel_id": channel_id, "body": body})
-        return {"id": vote_message_id, "author": {"id": UserId("")}}
-
-    def fake_start_thread_from_message(
-        _token: str,
-        channel_id: ChannelId,
-        message_id: MessageId,
-        name: str,
-        auto_archive_duration: AutoArchiveDuration,
-    ) -> Channel:
-        start_thread_from_message_calls.append(
-            {
-                "channel_id": channel_id,
-                "message_id": message_id,
-                "name": name,
-                "auto_archive_duration": auto_archive_duration,
-            }
-        )
-        return {"id": ChannelId("")}
-
-    monkeypatch.setattr(jobs, "post_message", fake_post_message)
-    monkeypatch.setattr(
-        jobs, "start_thread_from_message", fake_start_thread_from_message
-    )
-    caplog.set_level(logging.INFO, logger="jobs")
-
-    start_vote("dummy-token", vote_channel_id, today)
-
-    candidate_days = get_monday_to_sunday_after_next(today)
-    assert len(post_message_calls) == 1
-    post_message_call = post_message_calls[0]
-    assert post_message_call["channel_id"] == vote_channel_id
-    assert post_message_call["body"] == build_vote_message(candidate_days)
-
-    assert len(start_thread_from_message_calls) == 1
-    start_thread_from_message_call = start_thread_from_message_calls[0]
-    assert start_thread_from_message_call["channel_id"] == vote_channel_id
-    assert start_thread_from_message_call["message_id"] == vote_message_id
-    assert start_thread_from_message_call["name"] == "11/30-12/6 💬コメント"
-    assert start_thread_from_message_call["auto_archive_duration"] == 10080
-
-    assert caplog.messages == [
-        "Vote 3000 (11/30-12/6): posted",
-        "Vote 3000 (11/30-12/6): started thread '11/30-12/6 💬コメント'",
-    ]
-
+from vote import build_poll_answers, build_vote_message
 
 type Call = tuple[object, ...]
 
@@ -120,14 +49,18 @@ def make_vote_message(
     has_thread: bool = True,
     thread_locked: bool = False,
     thread_archived: bool = False,
+    answer_texts: list[str] | None = None,
 ) -> Message:
+    if answer_texts is None:
+        # Two answers are enough for the jobs that don't check the candidate days.
+        answer_texts = ["11/30 (月)", "どの日も難しい"]
     vote_message: Message = {
         "id": MessageId("3000"),
         "author": {"id": UserId("4000"), "bot": True},
         "poll": {
             "answers": [
-                {"answer_id": AnswerId(1), "poll_media": {"text": "11/30 (月)"}},
-                {"answer_id": AnswerId(2), "poll_media": {"text": "どの日も難しい"}},
+                {"answer_id": AnswerId(answer_id), "poll_media": {"text": text}}
+                for answer_id, text in enumerate(answer_texts, start=1)
             ],
             "expiry": POLL_EXPIRES_AT.isoformat(),
         },
@@ -164,6 +97,7 @@ class FakeDiscord:
             UserId("4003"): ChannelId("2001"),
         }
         self.post_message_errors: dict[ChannelId, Exception] = {}
+        self.start_thread_error: Exception | None = None
 
     def get_channel_messages(self, _token: str, channel_id: ChannelId) -> list[Message]:
         self.calls.append(("get_channel_messages", channel_id))
@@ -205,6 +139,27 @@ class FakeDiscord:
     ) -> None:
         self.calls.append(("add_reaction", channel_id, message_id, emoji))
 
+    def start_thread_from_message(
+        self,
+        _token: str,
+        channel_id: ChannelId,
+        message_id: MessageId,
+        name: str,
+        auto_archive_duration: AutoArchiveDuration,
+    ) -> Channel:
+        self.calls.append(
+            (
+                "start_thread_from_message",
+                channel_id,
+                message_id,
+                name,
+                auto_archive_duration,
+            )
+        )
+        if self.start_thread_error is not None:
+            raise self.start_thread_error
+        return {"id": ChannelId(message_id)}
+
     def modify_thread(
         self, _token: str, thread_id: ChannelId, *, locked: bool, archived: bool
     ) -> Channel:
@@ -226,7 +181,126 @@ def fake_discord(monkeypatch: pytest.MonkeyPatch) -> FakeDiscord:
     monkeypatch.setattr(jobs, "post_message", fake.post_message)
     monkeypatch.setattr(jobs, "add_reaction", fake.add_reaction)
     monkeypatch.setattr(jobs, "modify_thread", fake.modify_thread)
+    monkeypatch.setattr(
+        jobs, "start_thread_from_message", fake.start_thread_from_message
+    )
     return fake
+
+
+# Sun 11/22: the vote is for Mon 11/30 - Sun 12/6.
+START_VOTE_TODAY = date(2026, 11, 22)
+
+
+def answer_texts_for(today: date) -> list[str]:
+    candidate_days = get_monday_to_sunday_after_next(today)
+    return [
+        answer["poll_media"]["text"] for answer in build_poll_answers(candidate_days)
+    ]
+
+
+def run_start_vote() -> None:
+    start_vote("dummy-token", ChannelId("2000"), START_VOTE_TODAY)
+
+
+def test_start_vote_posts_vote_message_and_starts_comment_thread(
+    fake_discord: FakeDiscord, caplog: pytest.LogCaptureFixture
+) -> None:
+    fake_discord.messages = []
+    caplog.set_level(logging.INFO, logger="jobs")
+
+    run_start_vote()
+
+    candidate_days = get_monday_to_sunday_after_next(START_VOTE_TODAY)
+    assert fake_discord.calls == [
+        ("get_channel_messages", "2000"),
+        ("get_current_user",),
+        ("post_message", "2000"),
+        ("start_thread_from_message", "2000", "3001", "11/30-12/6 💬コメント", 10080),
+    ]
+    assert fake_discord.posted_messages == [
+        ("2000", build_vote_message(candidate_days))
+    ]
+    assert caplog.messages == [
+        "Vote 3001 (11/30-12/6): posted",
+        "Vote 3001 (11/30-12/6): started thread '11/30-12/6 💬コメント'",
+    ]
+
+
+def test_start_vote_posts_new_vote_when_latest_vote_is_for_another_week(
+    fake_discord: FakeDiscord,
+) -> None:
+    # Last week's vote (11/23-11/29) is the newest one in the channel.
+    fake_discord.messages = [
+        make_vote_message(answer_texts=answer_texts_for(date(2026, 11, 15)))
+    ]
+
+    run_start_vote()
+
+    assert fake_discord.call_names() == [
+        "get_channel_messages",
+        "get_current_user",
+        "post_message",
+        "start_thread_from_message",
+    ]
+
+
+def test_start_vote_does_nothing_when_this_weeks_vote_has_a_thread(
+    fake_discord: FakeDiscord, caplog: pytest.LogCaptureFixture
+) -> None:
+    fake_discord.messages = [
+        make_vote_message(answer_texts=answer_texts_for(START_VOTE_TODAY))
+    ]
+    caplog.set_level(logging.INFO, logger="jobs")
+
+    run_start_vote()
+
+    assert fake_discord.call_names() == ["get_channel_messages", "get_current_user"]
+    assert caplog.messages == [
+        "Vote 3000 (11/30-12/6): already posted; reusing it",
+        "Vote 3000 (11/30-12/6): already has a thread",
+    ]
+
+
+def test_start_vote_only_starts_thread_when_this_weeks_vote_has_none(
+    fake_discord: FakeDiscord, caplog: pytest.LogCaptureFixture
+) -> None:
+    # A retried run after posting the vote worked but starting the thread failed.
+    fake_discord.messages = [
+        make_vote_message(
+            answer_texts=answer_texts_for(START_VOTE_TODAY), has_thread=False
+        )
+    ]
+    caplog.set_level(logging.INFO, logger="jobs")
+
+    run_start_vote()
+
+    assert fake_discord.calls == [
+        ("get_channel_messages", "2000"),
+        ("get_current_user",),
+        ("start_thread_from_message", "2000", "3000", "11/30-12/6 💬コメント", 10080),
+    ]
+    assert caplog.messages == [
+        "Vote 3000 (11/30-12/6): already posted; reusing it",
+        "Vote 3000 (11/30-12/6): started thread '11/30-12/6 💬コメント'",
+    ]
+
+
+def test_start_vote_raises_when_starting_thread_fails(
+    fake_discord: FakeDiscord,
+) -> None:
+    fake_discord.messages = []
+    fake_discord.start_thread_error = make_discord_api_error(
+        500, "Internal Server Error", None, None
+    )
+
+    # The error goes up so the scheduler retries; the retry reuses the posted vote.
+    with pytest.raises(DiscordApiError):
+        run_start_vote()
+
+    assert fake_discord.call_names()[-2:] == [
+        "post_message",
+        "start_thread_from_message",
+    ]
 
 
 def run_report_if_all_voted(now: datetime) -> None:

@@ -202,3 +202,16 @@ def build_deadline_report_message(
     )
 
     return MessageCreateRequest(content=content)
+
+
+def is_vote_for(message: Message, candidate_days: list[date]) -> bool:
+    """Return whether the message's poll lists exactly these candidate days."""
+    if "poll" not in message:
+        return False
+    posted_texts = {
+        answer["poll_media"]["text"] for answer in message["poll"]["answers"]
+    }
+    expected_texts = {
+        answer["poll_media"]["text"] for answer in build_poll_answers(candidate_days)
+    }
+    return posted_texts == expected_texts

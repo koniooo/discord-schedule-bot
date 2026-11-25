@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
@@ -33,6 +33,7 @@ from vote import (
     get_poll_expires_at,
     has_own_reaction,
     is_human,
+    is_vote_for,
 )
 
 BOT_ID = UserId("4000")
@@ -442,3 +443,61 @@ def test_format_thread_url_links_to_thread() -> None:
         format_thread_url(GuildId("1000"), ChannelId("2000"))
         == "https://discord.com/channels/1000/2000"
     )
+
+
+MON_11_30_TO_SUN_12_6 = [
+    date(2026, 11, 30) + timedelta(days=offset) for offset in range(7)
+]
+ANSWER_TEXTS_11_30_TO_12_6 = [
+    "11/30 (月)",
+    "12/1 (火)",
+    "12/2 (水)",
+    "12/3 (木)",
+    "12/4 (金)",
+    "12/5 (土)",
+    "12/6 (日)",
+    "どの日も難しい",
+]
+
+
+@pytest.mark.parametrize(
+    ("answer_texts", "expected"),
+    [
+        pytest.param(ANSWER_TEXTS_11_30_TO_12_6, True, id="same_days"),
+        # Compared as sets, so a different answer order can't cause a second vote.
+        pytest.param(
+            list(reversed(ANSWER_TEXTS_11_30_TO_12_6)), True, id="same_days_reordered"
+        ),
+        pytest.param(
+            [
+                "11/23 (月)",
+                "11/24 (火)",
+                "11/25 (水)",
+                "11/26 (木)",
+                "11/27 (金)",
+                "11/28 (土)",
+                "11/29 (日)",
+                "どの日も難しい",
+            ],
+            False,
+            id="last_weeks_days",
+        ),
+        pytest.param(
+            ANSWER_TEXTS_11_30_TO_12_6[:-1], False, id="no_available_day_missing"
+        ),
+        pytest.param(None, False, id="no_poll"),
+    ],
+)
+def test_is_vote_for_returns_whether_poll_lists_the_candidate_days(
+    answer_texts: list[str] | None, expected: bool
+) -> None:
+    message = Message(id=MessageId("3000"), author={"id": BOT_ID})
+    if answer_texts is not None:
+        message["poll"] = PollResponse(
+            answers=[
+                {"answer_id": AnswerId(answer_id), "poll_media": {"text": text}}
+                for answer_id, text in enumerate(answer_texts, start=1)
+            ],
+            expiry=None,
+        )
+    assert is_vote_for(message, MON_11_30_TO_SUN_12_6) == expected

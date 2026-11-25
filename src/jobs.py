@@ -46,6 +46,7 @@ from vote import (
     get_poll_expires_at,
     has_own_reaction,
     is_human,
+    is_vote_for,
 )
 
 logger = logging.getLogger(__name__)
@@ -56,22 +57,42 @@ def _format_vote_log_prefix(vote_message_id: MessageId, vote_label: str) -> str:
 
 
 def start_vote(token: str, channel_id: ChannelId, today: date) -> None:
-    candidate_days = get_monday_to_sunday_after_next(today)
-    vote_message = post_message(token, channel_id, build_vote_message(candidate_days))
-    vote_message_id = vote_message["id"]
-    date_range = format_date_range(candidate_days[0], candidate_days[-1])
-    log_prefix = _format_vote_log_prefix(vote_message_id, date_range)
-    logger.info("%s posted", log_prefix)
+    """Post this week's vote and start its comment thread.
 
-    thread_name = format_comment_thread_name(candidate_days)
-    start_thread_from_message(
-        token,
-        channel_id,
-        vote_message_id,
-        thread_name,
-        COMMENT_THREAD_AUTO_ARCHIVE_MINUTES,
-    )
-    logger.info("%s started thread '%s'", log_prefix, thread_name)
+    If an earlier run already posted this week's vote, reuse it and only
+    start the thread if it's missing, so a retried run never posts twice.
+    """
+    candidate_days = get_monday_to_sunday_after_next(today)
+    date_range = format_date_range(candidate_days[0], candidate_days[-1])
+    channel_messages = get_channel_messages(token, channel_id)
+    bot_id = get_current_user(token)["id"]
+    latest_vote_message = find_latest_vote_message(channel_messages, bot_id)
+
+    if latest_vote_message is not None and is_vote_for(
+        latest_vote_message, candidate_days
+    ):
+        vote_message = latest_vote_message
+        log_prefix = _format_vote_log_prefix(vote_message["id"], date_range)
+        logger.info("%s already posted; reusing it", log_prefix)
+    else:
+        vote_message = post_message(
+            token, channel_id, build_vote_message(candidate_days)
+        )
+        log_prefix = _format_vote_log_prefix(vote_message["id"], date_range)
+        logger.info("%s posted", log_prefix)
+
+    if "thread" in vote_message:
+        logger.info("%s already has a thread", log_prefix)
+    else:
+        thread_name = format_comment_thread_name(candidate_days)
+        start_thread_from_message(
+            token,
+            channel_id,
+            vote_message["id"],
+            thread_name,
+            COMMENT_THREAD_AUTO_ARCHIVE_MINUTES,
+        )
+        logger.info("%s started thread '%s'", log_prefix, thread_name)
 
 
 def _fetch_latest_vote(

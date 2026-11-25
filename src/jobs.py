@@ -48,12 +48,17 @@ from vote import (
 logger = logging.getLogger(__name__)
 
 
+def _format_vote_log_prefix(vote_message_id: MessageId, vote_label: str) -> str:
+    return f"Vote {vote_message_id} ({vote_label}):"
+
+
 def start_vote(token: str, channel_id: ChannelId, today: date) -> None:
     candidate_days = get_monday_to_sunday_after_next(today)
     vote_message = post_message(token, channel_id, build_vote_message(candidate_days))
     vote_message_id = vote_message["id"]
     date_range = format_date_range(candidate_days[0], candidate_days[-1])
-    logger.info("Vote %s (%s): posted", vote_message_id, date_range)
+    log_prefix = _format_vote_log_prefix(vote_message_id, date_range)
+    logger.info("%s posted", log_prefix)
 
     thread_name = format_comment_thread_name(candidate_days)
     start_thread_from_message(
@@ -63,9 +68,7 @@ def start_vote(token: str, channel_id: ChannelId, today: date) -> None:
         thread_name,
         COMMENT_THREAD_AUTO_ARCHIVE_MINUTES,
     )
-    logger.info(
-        "Vote %s (%s): started thread '%s'", vote_message_id, date_range, thread_name
-    )
+    logger.info("%s started thread '%s'", log_prefix, thread_name)
 
 
 def _find_vote_message(
@@ -78,12 +81,12 @@ def _find_vote_message(
     if vote_message is None:
         logger.warning("No vote message found in channel %s", channel_id)
         return None
+
     if "poll" not in vote_message:
-        logger.warning(
-            "Vote %s (%s): the message has no poll",
-            vote_message["id"],
-            _format_vote_label(vote_message),
+        log_prefix = _format_vote_log_prefix(
+            vote_message["id"], _format_vote_label(vote_message)
         )
+        logger.warning("%s the message has no poll", log_prefix)
         return None
     return vote_message, vote_message["poll"]
 
@@ -127,14 +130,16 @@ def report_if_all_voted(
         return
     vote_message, poll = found
     vote_message_id = vote_message["id"]
-    vote_label = _format_vote_label(vote_message)
+    log_prefix = _format_vote_log_prefix(
+        vote_message_id, _format_vote_label(vote_message)
+    )
 
     poll_expires_at = get_poll_expires_at(poll)
     if now >= poll_expires_at:
-        logger.debug("Vote %s (%s): already closed", vote_message_id, vote_label)
+        logger.debug("%s already closed", log_prefix)
         return
     if has_own_reaction(vote_message, ALL_VOTED_REPORTED_EMOJI):
-        logger.debug("Vote %s (%s): already reported", vote_message_id, vote_label)
+        logger.debug("%s already reported", log_prefix)
         return
 
     voter_ids = _fetch_voter_ids(token, channel_id, vote_message_id, poll)
@@ -148,9 +153,8 @@ def report_if_all_voted(
     voted_count = human_member_count - len(human_non_voters)
 
     logger.info(
-        "Vote %s (%s): %d/%d members have voted",
-        vote_message_id,
-        vote_label,
+        "%s %d/%d members have voted",
+        log_prefix,
         voted_count,
         human_member_count,
     )
@@ -162,9 +166,7 @@ def report_if_all_voted(
         url = format_thread_url(guild_id, get_thread_id_started_from(vote_message_id))
     else:
         logger.warning(
-            "Vote %s (%s): linking to the vote message instead of the thread",
-            vote_message_id,
-            vote_label,
+            "%s linking to the vote message instead of the thread", log_prefix
         )
         url = format_message_url(guild_id, channel_id, vote_message_id)
 
@@ -174,11 +176,7 @@ def report_if_all_voted(
         poll_expires_at,
     )
     _send_dm(token, master_user_id, all_voted_report_message)
-    logger.info(
-        "Vote %s (%s): sent the all-voted report to the master",
-        vote_message_id,
-        vote_label,
-    )
+    logger.info("%s sent the all-voted report to the master", log_prefix)
     add_reaction(token, channel_id, vote_message_id, ALL_VOTED_REPORTED_EMOJI)
 
 
@@ -199,14 +197,12 @@ def send_reminders(
         return
     vote_message, poll = found
     vote_message_id = vote_message["id"]
-    vote_label = _format_vote_label(vote_message)
+    log_prefix = _format_vote_log_prefix(
+        vote_message_id, _format_vote_label(vote_message)
+    )
     poll_expires_at = get_poll_expires_at(poll)
     if now >= poll_expires_at:
-        logger.warning(
-            "Vote %s (%s): already closed; no reminders sent",
-            vote_message_id,
-            vote_label,
-        )
+        logger.warning("%s already closed; no reminders sent", log_prefix)
         return
 
     voter_ids = _fetch_voter_ids(token, channel_id, vote_message_id, poll)
@@ -214,11 +210,7 @@ def send_reminders(
 
     human_non_voters = collect_human_non_voters(guild_members, voter_ids)
     if not human_non_voters:
-        logger.info(
-            "Vote %s (%s): everyone has voted; no reminders needed",
-            vote_message_id,
-            vote_label,
-        )
+        logger.info("%s everyone has voted; no reminders needed", log_prefix)
         return
 
     dm_sent_members: list[GuildMember] = []
@@ -238,9 +230,8 @@ def send_reminders(
                 CANNOT_SEND_MESSAGES_TO_USER_NO_MUTUAL_GUILDS,
             ):
                 logger.exception(
-                    "Vote %s (%s): failed to send a reminder DM to %s",
-                    vote_message_id,
-                    vote_label,
+                    "%s failed to send a reminder DM to %s",
+                    log_prefix,
                     get_display_name(human_non_voter),
                 )
         else:
@@ -257,9 +248,8 @@ def send_reminders(
         )
         member_parts.append(f"not sent to: {failures}")
     logger.info(
-        "Vote %s (%s): sent %d/%d reminder DMs; %s",
-        vote_message_id,
-        vote_label,
+        "%s sent %d/%d reminder DMs; %s",
+        log_prefix,
         len(dm_sent_members),
         len(human_non_voters),
         "; ".join(member_parts),
@@ -270,8 +260,4 @@ def send_reminders(
             vote_message_id, poll_expires_at
         )
         post_message(token, channel_id, vote_channel_reminder_message)
-        logger.info(
-            "Vote %s (%s): posted a reminder in the vote channel",
-            vote_message_id,
-            vote_label,
-        )
+        logger.info("%s posted a reminder in the vote channel", log_prefix)

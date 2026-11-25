@@ -21,6 +21,7 @@ from discord_api import (
     get_current_user,
     get_thread_id_started_from,
     list_guild_members,
+    modify_thread,
     post_message,
     start_thread_from_message,
 )
@@ -29,7 +30,9 @@ from vote import (
     ALL_VOTED_REPORTED_EMOJI,
     COMMENT_THREAD_AUTO_ARCHIVE_MINUTES,
     COMMENT_THREAD_NAME_SUFFIX,
+    DEADLINE_REPORTED_EMOJI,
     build_all_voted_report_message,
+    build_deadline_report_message,
     build_dm_reminder_message,
     build_vote_channel_reminder_message,
     build_vote_message,
@@ -265,3 +268,72 @@ def send_reminders(
         )
         post_message(token, channel_id, vote_channel_reminder_message)
         logger.info("%s posted a reminder in the vote channel", log_prefix)
+
+
+def close_vote(
+    token: str,
+    guild_id: GuildId,
+    channel_id: ChannelId,
+    master_user_id: UserId,
+    now: datetime,
+) -> None:
+    """Report the closed vote to the master and lock its comment thread.
+
+    Skips the DM if the master already got a report (✅ or 🏁), and skips
+    the thread step if the thread is already locked and archived, so a
+    retried run doesn't repeat finished steps.
+    `now` must be timezone-aware.
+    """
+    found = _find_vote_message(token, channel_id)
+    if found is None:
+        return
+    vote_message, poll = found
+    vote_message_id = vote_message["id"]
+    log_prefix = _format_vote_log_prefix(
+        vote_message_id, _format_vote_label(vote_message)
+    )
+    poll_expires_at = get_poll_expires_at(poll)
+    if now < poll_expires_at:
+        logger.warning(
+            "%s the poll hasn't closed yet (closes at %s)", log_prefix, poll_expires_at
+        )
+        return
+    if has_own_reaction(vote_message, DEADLINE_REPORTED_EMOJI):
+        logger.info("%s already sent the deadline report", log_prefix)
+    elif has_own_reaction(vote_message, ALL_VOTED_REPORTED_EMOJI):
+        logger.info(
+            "%s already sent the all-voted report; skipping the deadline report",
+            log_prefix,
+        )
+    else:
+        voter_ids = _fetch_voter_ids(token, channel_id, vote_message_id, poll)
+        guild_members = list_guild_members(token, guild_id)
+        human_members = [
+            guild_member for guild_member in guild_members if is_human(guild_member)
+        ]
+        human_non_voters = collect_human_non_voters(guild_members, voter_ids)
+        human_non_voter_ids = [
+            non_voter["user"]["id"] for non_voter in human_non_voters
+        ]
+        url = _choose_report_url(guild_id, channel_id, vote_message, log_prefix)
+        deadline_report_message = build_deadline_report_message(
+            len(human_members), human_non_voter_ids, url
+        )
+
+        _send_dm(token, master_user_id, deadline_report_message)
+        logger.info("%s sent the deadline report to the master", log_prefix)
+        add_reaction(token, channel_id, vote_message_id, DEADLINE_REPORTED_EMOJI)
+
+    if "thread" not in vote_message:
+        return
+    thread_metadata = vote_message["thread"]["thread_metadata"]
+    if thread_metadata["locked"] and thread_metadata["archived"]:
+        logger.debug("%s the thread is already locked and archived", log_prefix)
+    else:
+        thread_id = get_thread_id_started_from(vote_message_id)
+        # An archived thread can't be locked while it stays archived
+        # (400, Discord code 50083), so unarchive it while locking, then archive it.
+        # Seen on the test server: this works from every locked/archived state.
+        modify_thread(token, thread_id, locked=True, archived=False)
+        modify_thread(token, thread_id, locked=True, archived=True)
+        logger.info("%s locked and archived the thread", log_prefix)

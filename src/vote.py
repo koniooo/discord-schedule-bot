@@ -31,6 +31,7 @@ COMMENT_THREAD_NAME_SUFFIX = "💬コメント"
 COMMENT_THREAD_AUTO_ARCHIVE_MINUTES: AutoArchiveDuration = 60 * 24 * 7
 
 ALL_VOTED_REPORTED_EMOJI = "✅"
+DEADLINE_REPORTED_EMOJI = "🏁"
 
 
 def build_poll_answers(candidate_days: list[date]) -> list[PollAnswer]:

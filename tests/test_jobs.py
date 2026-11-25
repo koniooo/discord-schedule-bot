@@ -20,7 +20,7 @@ from discord_api import (
     User,
     UserId,
 )
-from jobs import report_if_all_voted, send_reminders, start_vote
+from jobs import close_vote, report_if_all_voted, send_reminders, start_vote
 from schedule import get_monday_to_sunday_after_next
 from vote import build_vote_message
 
@@ -115,7 +115,11 @@ def make_discord_api_error(
 
 
 def make_vote_message(
-    *, reactions: list[Reaction] | None = None, has_thread: bool = True
+    *,
+    reactions: list[Reaction] | None = None,
+    has_thread: bool = True,
+    thread_locked: bool = False,
+    thread_archived: bool = False,
 ) -> Message:
     vote_message: Message = {
         "id": MessageId("3000"),
@@ -133,7 +137,7 @@ def make_vote_message(
     if has_thread:
         vote_message["thread"] = {
             "name": "11/30-12/6 💬コメント",
-            "thread_metadata": {"archived": False, "locked": False},
+            "thread_metadata": {"archived": thread_archived, "locked": thread_locked},
         }
     return vote_message
 
@@ -201,6 +205,12 @@ class FakeDiscord:
     ) -> None:
         self.calls.append(("add_reaction", channel_id, message_id, emoji))
 
+    def modify_thread(
+        self, _token: str, thread_id: ChannelId, *, locked: bool, archived: bool
+    ) -> Channel:
+        self.calls.append(("modify_thread", thread_id, locked, archived))
+        return {"id": thread_id}
+
     def call_names(self) -> list[object]:
         return [call[0] for call in self.calls]
 
@@ -215,6 +225,7 @@ def fake_discord(monkeypatch: pytest.MonkeyPatch) -> FakeDiscord:
     monkeypatch.setattr(jobs, "create_dm_channel", fake.create_dm_channel)
     monkeypatch.setattr(jobs, "post_message", fake.post_message)
     monkeypatch.setattr(jobs, "add_reaction", fake.add_reaction)
+    monkeypatch.setattr(jobs, "modify_thread", fake.modify_thread)
     return fake
 
 
@@ -588,3 +599,174 @@ def test_send_reminders_continues_after_other_dm_errors(
         "Vote 3000 (11/30-12/6): posted a reminder in the vote channel"
         in caplog.messages
     )
+
+
+def run_close_vote(now: datetime) -> None:
+    close_vote("dummy-token", GuildId("1001"), ChannelId("2000"), UserId("4003"), now)
+
+
+def test_close_vote_dms_master_then_marks_vote_then_locks_thread(
+    fake_discord: FakeDiscord, caplog: pytest.LogCaptureFixture
+) -> None:
+    fake_discord.voters_by_answer_id = {AnswerId(1): [{"id": UserId("4001")}]}
+    caplog.set_level(logging.INFO, logger="jobs")
+
+    run_close_vote(POLL_EXPIRES_AT)
+
+    assert fake_discord.calls == [
+        ("get_channel_messages", "2000"),
+        ("get_current_user",),
+        ("get_answer_voters", "2000", "3000", 1),
+        ("get_answer_voters", "2000", "3000", 2),
+        ("list_guild_members", "1001"),
+        ("create_dm_channel", "4003"),
+        ("post_message", "2001"),
+        ("add_reaction", "2000", "3000", "🏁"),
+        ("modify_thread", "3000", True, False),
+        ("modify_thread", "3000", True, True),
+    ]
+    assert fake_discord.posted_messages == [
+        (
+            "2001",
+            {
+                # Two humans: the bot member must not be counted.
+                "content": "投票が締め切られたクポ～\n"
+                "1/2人が投票したクポ。\n"
+                "https://discord.com/channels/1001/3000\n"
+                "\n"
+                "以下のメンバーが未投票だったクポ。\n"
+                "<@4002>"
+            },
+        )
+    ]
+    assert caplog.messages == [
+        "Vote 3000 (11/30-12/6): sent the deadline report to the master",
+        "Vote 3000 (11/30-12/6): locked and archived the thread",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("emoji", "expected_log"),
+    [
+        pytest.param(
+            "✅",
+            "Vote 3000 (11/30-12/6): already sent the all-voted report; "
+            "skipping the deadline report",
+            id="all_voted_report_sent",
+        ),
+        # A retried run after the DM was sent but locking the thread failed.
+        pytest.param(
+            "🏁",
+            "Vote 3000 (11/30-12/6): already sent the deadline report",
+            id="deadline_report_sent",
+        ),
+    ],
+)
+def test_close_vote_skips_dm_but_still_locks_thread_when_master_got_a_report(
+    emoji: str,
+    expected_log: str,
+    fake_discord: FakeDiscord,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    fake_discord.messages = [
+        make_vote_message(reactions=[{"me": True, "emoji": {"name": emoji}}])
+    ]
+    caplog.set_level(logging.INFO, logger="jobs")
+
+    run_close_vote(POLL_EXPIRES_AT)
+
+    assert fake_discord.calls == [
+        ("get_channel_messages", "2000"),
+        ("get_current_user",),
+        ("modify_thread", "3000", True, False),
+        ("modify_thread", "3000", True, True),
+    ]
+    assert caplog.messages == [
+        expected_log,
+        "Vote 3000 (11/30-12/6): locked and archived the thread",
+    ]
+
+
+LOCK_AND_ARCHIVE_CALLS: list[Call] = [
+    ("modify_thread", "3000", True, False),
+    ("modify_thread", "3000", True, True),
+]
+
+
+@pytest.mark.parametrize(
+    ("thread_locked", "thread_archived", "expected_modify_calls"),
+    [
+        pytest.param(False, False, LOCK_AND_ARCHIVE_CALLS, id="open"),
+        pytest.param(True, False, LOCK_AND_ARCHIVE_CALLS, id="locked_only"),
+        # One call with archived=True fails here (Discord code 50083).
+        pytest.param(False, True, LOCK_AND_ARCHIVE_CALLS, id="archived_only"),
+        pytest.param(True, True, [], id="locked_and_archived"),
+    ],
+)
+def test_close_vote_locks_and_archives_thread_unless_already_done(
+    thread_locked: bool,
+    thread_archived: bool,
+    expected_modify_calls: list[Call],
+    fake_discord: FakeDiscord,
+) -> None:
+    # The DM step is skipped, so only the thread step is tested.
+    fake_discord.messages = [
+        make_vote_message(
+            reactions=[{"me": True, "emoji": {"name": "🏁"}}],
+            thread_locked=thread_locked,
+            thread_archived=thread_archived,
+        )
+    ]
+
+    run_close_vote(POLL_EXPIRES_AT)
+
+    assert [
+        call for call in fake_discord.calls if call[0] == "modify_thread"
+    ] == expected_modify_calls
+
+
+def test_close_vote_links_to_vote_message_without_thread(
+    fake_discord: FakeDiscord, caplog: pytest.LogCaptureFixture
+) -> None:
+    fake_discord.messages = [make_vote_message(has_thread=False)]
+    caplog.set_level(logging.INFO, logger="jobs")
+
+    run_close_vote(POLL_EXPIRES_AT)
+
+    assert len(fake_discord.posted_messages) == 1
+    report_content = fake_discord.posted_messages[0][1]["content"]
+    assert "https://discord.com/channels/1001/2000/3000" in report_content
+    assert "modify_thread" not in fake_discord.call_names()
+    assert caplog.messages == [
+        "Vote 3000 (no thread): linking to the vote message instead of the thread",
+        "Vote 3000 (no thread): sent the deadline report to the master",
+    ]
+
+
+def test_close_vote_does_nothing_before_poll_expiry(
+    fake_discord: FakeDiscord, caplog: pytest.LogCaptureFixture
+) -> None:
+    run_close_vote(POLL_EXPIRES_AT - timedelta(seconds=1))
+
+    assert fake_discord.call_names() == ["get_channel_messages", "get_current_user"]
+    assert caplog.messages == [
+        "Vote 3000 (11/30-12/6): the poll hasn't closed yet "
+        "(closes at 2026-11-24 03:00:00+00:00)"
+    ]
+
+
+def test_close_vote_does_not_mark_vote_or_lock_thread_when_dm_fails(
+    fake_discord: FakeDiscord,
+) -> None:
+    fake_discord.post_message_errors = {
+        ChannelId("2001"): make_discord_api_error(
+            500, "Internal Server Error", None, None
+        )
+    }
+
+    with pytest.raises(DiscordApiError):
+        run_close_vote(POLL_EXPIRES_AT)
+
+    # Nothing is marked, so a retried run sends the DM again and then locks the thread.
+    assert "add_reaction" not in fake_discord.call_names()
+    assert "modify_thread" not in fake_discord.call_names()

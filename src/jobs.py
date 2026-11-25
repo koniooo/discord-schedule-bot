@@ -329,7 +329,7 @@ def close_vote(
         return
     thread_metadata = vote_message["thread"]["thread_metadata"]
     if thread_metadata["locked"] and thread_metadata["archived"]:
-        logger.debug("%s the thread is already locked and archived", log_prefix)
+        logger.info("%s the thread is already locked and archived", log_prefix)
     else:
         thread_id = get_thread_id_started_from(vote_message_id)
         # An archived thread can't be locked while it stays archived

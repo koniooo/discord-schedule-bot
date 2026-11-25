@@ -323,7 +323,9 @@ def test_report_if_all_voted_does_nothing_when_already_reported(
     run_report_if_all_voted(POLL_EXPIRES_AT - timedelta(days=1))
 
     assert fake_discord.call_names() == ["get_channel_messages", "get_current_user"]
-    assert caplog.messages == ["Vote 3000 (11/30-12/6): already reported"]
+    assert caplog.messages == [
+        "Vote 3000 (11/30-12/6): already sent the all-voted report"
+    ]
 
 
 def test_report_if_all_voted_does_nothing_at_poll_expiry(
@@ -337,7 +339,7 @@ def test_report_if_all_voted_does_nothing_at_poll_expiry(
     run_report_if_all_voted(POLL_EXPIRES_AT)
 
     assert fake_discord.call_names() == ["get_channel_messages", "get_current_user"]
-    assert caplog.messages == ["Vote 3000 (11/30-12/6): already closed"]
+    assert caplog.messages == ["Vote 3000 (11/30-12/6): the poll has already closed"]
 
 
 def test_report_if_all_voted_reports_one_second_before_poll_expiry(
@@ -452,7 +454,8 @@ def test_send_reminders_warns_when_poll_is_closed(
 
     assert fake_discord.call_names() == ["get_channel_messages", "get_current_user"]
     assert (
-        "Vote 3000 (11/30-12/6): already closed; no reminders sent" in caplog.messages
+        "Vote 3000 (11/30-12/6): the poll has already closed; no reminders sent"
+        in caplog.messages
     )
 
 

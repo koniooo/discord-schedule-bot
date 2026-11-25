@@ -74,9 +74,10 @@ def start_vote(token: str, channel_id: ChannelId, today: date) -> None:
     logger.info("%s started thread '%s'", log_prefix, thread_name)
 
 
-def _find_vote_message(
+def _fetch_latest_vote(
     token: str, channel_id: ChannelId
 ) -> tuple[Message, PollResponse] | None:
+    """Fetch the newest vote in the channel, or log a warning and return None."""
     channel_messages = get_channel_messages(token, channel_id)
     bot_id = get_current_user(token)["id"]
     vote_message = find_latest_vote_message(channel_messages, bot_id)
@@ -139,7 +140,7 @@ def report_if_all_voted(
     Marks the vote message with ALL_VOTED_REPORTED_EMOJI after the DM is sent.
     `now` must be timezone-aware.
     """
-    found = _find_vote_message(token, channel_id)
+    found = _fetch_latest_vote(token, channel_id)
     if found is None:
         return
     vote_message, poll = found
@@ -199,7 +200,7 @@ def send_reminders(
     post one reminder in the vote channel as well.
     `now` must be timezone-aware.
     """
-    found = _find_vote_message(token, channel_id)
+    found = _fetch_latest_vote(token, channel_id)
     if found is None:
         return
     vote_message, poll = found
@@ -284,7 +285,7 @@ def close_vote(
     retried run doesn't repeat finished steps.
     `now` must be timezone-aware.
     """
-    found = _find_vote_message(token, channel_id)
+    found = _fetch_latest_vote(token, channel_id)
     if found is None:
         return
     vote_message, poll = found

@@ -113,6 +113,17 @@ def _send_dm(token: str, recipient_id: UserId, body: MessageCreateRequest) -> No
     post_message(token, dm_channel["id"], body)
 
 
+def _choose_report_url(
+    guild_id: GuildId, channel_id: ChannelId, vote_message: Message, log_prefix: str
+) -> str:
+    if "thread" in vote_message:
+        return format_thread_url(
+            guild_id, get_thread_id_started_from(vote_message["id"])
+        )
+    logger.warning("%s linking to the vote message instead of the thread", log_prefix)
+    return format_message_url(guild_id, channel_id, vote_message["id"])
+
+
 def report_if_all_voted(
     token: str,
     guild_id: GuildId,
@@ -162,14 +173,7 @@ def report_if_all_voted(
     if human_non_voters:
         return
 
-    if "thread" in vote_message:
-        url = format_thread_url(guild_id, get_thread_id_started_from(vote_message_id))
-    else:
-        logger.warning(
-            "%s linking to the vote message instead of the thread", log_prefix
-        )
-        url = format_message_url(guild_id, channel_id, vote_message_id)
-
+    url = _choose_report_url(guild_id, channel_id, vote_message, log_prefix)
     all_voted_report_message = build_all_voted_report_message(
         human_member_count,
         url,

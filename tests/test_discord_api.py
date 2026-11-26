@@ -1,18 +1,21 @@
 import email.message
 import json
+from http.client import RemoteDisconnected
 from io import BytesIO
 from typing import Literal
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request
 
 import pytest
 
 import discord_api
 from discord_api import (
+    REQUEST_TIMEOUT_SECONDS,
     AnswerId,
     ChannelId,
     DiscordApiError,
     DiscordErrorBody,
+    DiscordNetworkError,
     GuildId,
     Message,
     MessageId,
@@ -36,11 +39,13 @@ from discord_api import (
 class FakeUrlopen:
     def __init__(self) -> None:
         self.requests: list[Request] = []
+        self.timeouts: list[float] = []
         self.response = b"{}"
-        self.error: HTTPError | None = None
+        self.error: Exception | None = None
 
-    def __call__(self, request: Request) -> BytesIO:
+    def __call__(self, request: Request, timeout: float) -> BytesIO:
         self.requests.append(request)
+        self.timeouts.append(timeout)
         if self.error is not None:
             raise self.error
         return BytesIO(self.response)
@@ -266,6 +271,49 @@ def test_post_message_keeps_http_error_as_cause(fake_urlopen: FakeUrlopen) -> No
         post_message("dummy-token", ChannelId("2000"), {"content": ""})
 
     assert caught.value.__cause__ is http_error
+
+
+@pytest.mark.parametrize(
+    ("error", "expected_reason"),
+    [
+        pytest.param(
+            URLError("[Errno 11001] getaddrinfo failed"),
+            "URLError: <urlopen error [Errno 11001] getaddrinfo failed>",
+            id="dns_failure",
+        ),
+        # A timeout while reading the response isn't wrapped in URLError.
+        pytest.param(
+            TimeoutError("timed out"),
+            "TimeoutError: timed out",
+            id="timeout",
+        ),
+        pytest.param(
+            RemoteDisconnected("Remote end closed connection without response"),
+            "RemoteDisconnected: Remote end closed connection without response",
+            id="connection_closed",
+        ),
+    ],
+)
+def test_post_message_raises_discord_network_error_when_no_response(
+    error: Exception, expected_reason: str, fake_urlopen: FakeUrlopen
+) -> None:
+    fake_urlopen.error = error
+
+    with pytest.raises(DiscordNetworkError) as caught:
+        post_message("dummy-token", ChannelId("2000"), {"content": ""})
+
+    assert caught.value.reason == expected_reason
+    # str(error) is the summary line shown in logs.
+    assert str(caught.value) == (
+        f"POST /api/v10/channels/2000/messages got no response: {expected_reason}"
+    )
+    assert caught.value.__cause__ is error
+
+
+def test_requests_are_sent_with_a_timeout(fake_urlopen: FakeUrlopen) -> None:
+    get_current_user("dummy-token")
+
+    assert fake_urlopen.timeouts == [REQUEST_TIMEOUT_SECONDS]
 
 
 def make_discord_api_error(

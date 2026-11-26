@@ -16,6 +16,10 @@ from urllib.request import Request, urlopen
 
 DISCORD_API_BASE_URL = "https://discord.com/api/v10"
 USER_AGENT = "DiscordBot (https://github.com/koniooo/discord-schedule-bot, 0.1.0)"
+# Discord usually answers within a second; 10s also waits out a slow answer
+# while leaving room for the other requests in one Lambda run.
+REQUEST_TIMEOUT_SECONDS = 10
+
 # Discord's JSON error codes when a user can't receive DMs from the bot.
 # Both come with HTTP 403.
 # Seen on the test server when the member blocked the bot.
@@ -180,8 +184,7 @@ def parse_error_body(body: bytes) -> DiscordErrorBody:
 
 
 class DiscordApiError(Exception):
-    """A request to the Discord API failed.
-
+    """Discord answered a request with an HTTP error status.
     Attributes:
         status: The HTTP status code, e.g. 403.
         reason: The HTTP reason phrase, e.g. "Forbidden".
@@ -219,6 +222,19 @@ class DiscordApiError(Exception):
         self.body = body
 
 
+class DiscordNetworkError(Exception):
+    """A request to the Discord API got no response.
+
+    Attributes:
+        reason: What went wrong, e.g. "TimeoutError: timed out".
+    """
+
+    def __init__(self, *, method: str, path: str, reason: str) -> None:
+        summary = f"{method} {path} got no response: {reason}"
+        super().__init__(summary)
+        self.reason = reason
+
+
 def format_error_details(error: DiscordApiError) -> str:
     """Return the status and Discord's error details on one line.
 
@@ -236,10 +252,11 @@ def format_error_details(error: DiscordApiError) -> str:
 def _send(request: Request) -> bytes:
     """Send the request to Discord and return the raw response body.
 
-    Raises DiscordApiError when Discord answers with an HTTP error status.
+    Raises DiscordApiError when Discord answers with an HTTP error status,
+    and DiscordNetworkError when no response arrives (e.g. a timeout).
     """
     try:
-        with urlopen(request) as response:
+        with urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
             return response.read()
     except HTTPError as error:
         body = error.read()
@@ -252,6 +269,12 @@ def _send(request: Request) -> bytes:
             discord_code=error_body.discord_code,
             message=error_body.message,
             body=body,
+        ) from error
+    except OSError as error:
+        raise DiscordNetworkError(
+            method=request.get_method(),
+            path=request.selector,
+            reason=f"{type(error).__name__}: {error}",
         ) from error
 
 

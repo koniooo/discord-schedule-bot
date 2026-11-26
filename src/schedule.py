@@ -13,7 +13,7 @@ def get_monday_of_week(day: date) -> date:
 
 
 def get_seven_days_from(start: date) -> list[date]:
-    return [start + timedelta(days=i) for i in range(7)]
+    return [start + timedelta(days=offset) for offset in range(7)]
 
 
 def get_monday_to_sunday_after_next(day: date) -> list[date]:

@@ -268,7 +268,9 @@ def send_reminders(
 
     member_parts: list[str] = []
     if dm_sent_members:
-        sent_names = ", ".join(get_display_name(member) for member in dm_sent_members)
+        sent_names = ", ".join(
+            get_display_name(dm_sent_member) for dm_sent_member in dm_sent_members
+        )
         member_parts.append(f"sent to: {sent_names}")
     if dm_failures:
         failures = ", ".join(
@@ -335,7 +337,7 @@ def close_vote(
         ]
         human_non_voters = collect_human_non_voters(guild_members, voter_ids)
         human_non_voter_ids = [
-            non_voter["user"]["id"] for non_voter in human_non_voters
+            human_non_voter["user"]["id"] for human_non_voter in human_non_voters
         ]
         url = _choose_report_url(guild_id, channel_id, vote_message, log_prefix)
         deadline_report_message = build_deadline_report_message(

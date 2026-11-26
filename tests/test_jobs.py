@@ -10,6 +10,7 @@ from discord_api import (
     Channel,
     ChannelId,
     DiscordApiError,
+    DiscordNetworkError,
     GuildId,
     GuildMember,
     Message,
@@ -639,19 +640,37 @@ def test_send_reminders_replies_once_when_several_dms_fail(
     )
 
 
-def test_send_reminders_continues_after_other_dm_errors(
-    fake_discord: FakeDiscord, caplog: pytest.LogCaptureFixture
+@pytest.mark.parametrize(
+    ("error", "expected_details"),
+    [
+        pytest.param(
+            make_discord_api_error(500, "Internal Server Error", None, None),
+            "500 Internal Server Error / no Discord code",
+            id="http_error",
+        ),
+        pytest.param(
+            DiscordNetworkError(
+                method="POST",
+                path="/api/v10/channels/2101/messages",
+                reason="TimeoutError: timed out",
+            ),
+            "no response: TimeoutError: timed out",
+            id="no_response",
+        ),
+    ],
+)
+def test_send_reminders_continues_after_unexpected_dm_errors(
+    error: Exception,
+    expected_details: str,
+    fake_discord: FakeDiscord,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    fake_discord.post_message_errors = {
-        ChannelId("2101"): make_discord_api_error(
-            500, "Internal Server Error", None, None
-        )
-    }
+    fake_discord.post_message_errors = {ChannelId("2101"): error}
     caplog.set_level(logging.INFO, logger="jobs")
 
     run_send_reminders(POLL_EXPIRES_AT - timedelta(days=1))
 
-    # The failed DM is covered by one reply in the vote channel.
+    # The failed DM doesn't stop the loop, and one reply in the vote channel covers it.
     assert [channel_id for channel_id, _ in fake_discord.posted_messages] == [
         "2102",
         "2000",
@@ -662,12 +681,12 @@ def test_send_reminders_continues_after_other_dm_errors(
         if record.getMessage()
         == "Vote 3000 (11/30-12/6): failed to send a reminder DM to Alice"
     ]
-    # logger.exception keeps the traceback, so the cause can be found in the logs.
+    # Unlike closed DMs, these aren't the member's choice, so they're logged with
+    # a traceback; logger.exception keeps it, so the cause can be found in the logs.
     assert failure_record.exc_info is not None
     assert (
         "Vote 3000 (11/30-12/6): sent 1/2 reminder DMs; sent to: bob; "
-        "not sent to: Alice (500 Internal Server Error / no Discord code)"
-        in caplog.messages
+        f"not sent to: Alice ({expected_details})" in caplog.messages
     )
     assert (
         "Vote 3000 (11/30-12/6): posted a reminder in the vote channel"

@@ -7,6 +7,7 @@ from discord_api import (
     CANNOT_SEND_MESSAGES_TO_USER_NO_MUTUAL_GUILDS,
     ChannelId,
     DiscordApiError,
+    DiscordNetworkError,
     GuildId,
     GuildMember,
     Message,
@@ -16,7 +17,6 @@ from discord_api import (
     UserId,
     add_reaction,
     create_dm_channel,
-    format_error_details,
     get_answer_voters,
     get_channel_messages,
     get_current_user,
@@ -239,7 +239,7 @@ def send_reminders(
         return
 
     dm_sent_members: list[GuildMember] = []
-    dm_failures: list[tuple[GuildMember, DiscordApiError]] = []
+    dm_failures: list[tuple[GuildMember, DiscordApiError | DiscordNetworkError]] = []
     dm_reminder_message = build_dm_reminder_message(
         format_message_url(guild_id, channel_id, vote_message_id), poll_expires_at
     )
@@ -247,13 +247,14 @@ def send_reminders(
     for human_non_voter in human_non_voters:
         try:
             _send_dm(token, human_non_voter["user"]["id"], dm_reminder_message)
-        except DiscordApiError as error:
+        except (DiscordApiError, DiscordNetworkError) as error:
             dm_failures.append((human_non_voter, error))
-            # Closed DMs are the member's choice; any other error is a problem.
-            if error.discord_code not in (
+            closed_dm = isinstance(error, DiscordApiError) and error.discord_code in (
                 CANNOT_SEND_MESSAGES_TO_USER,
                 CANNOT_SEND_MESSAGES_TO_USER_NO_MUTUAL_GUILDS,
-            ):
+            )
+            # Closed DMs are the member's choice; any other error is a problem.
+            if not closed_dm:
                 logger.exception(
                     "%s failed to send a reminder DM to %s",
                     log_prefix,
@@ -270,7 +271,7 @@ def send_reminders(
         member_parts.append(f"sent to: {sent_names}")
     if dm_failures:
         failures = ", ".join(
-            f"{get_display_name(member)} ({format_error_details(error)})"
+            f"{get_display_name(member)} ({error.format_details()})"
             for member, error in dm_failures
         )
         member_parts.append(f"not sent to: {failures}")

@@ -23,7 +23,6 @@ from discord_api import (
     add_reaction,
     build_request,
     create_dm_channel,
-    format_error_details,
     get_answer_voters,
     get_channel_messages,
     get_current_user,
@@ -370,10 +369,20 @@ def make_discord_api_error(
         ),
     ],
 )
-def test_format_error_details_shows_http_status_and_discord_details(
+def test_discord_api_error_format_details_shows_http_status_and_discord_details(
     error: DiscordApiError, expected: str
 ) -> None:
-    assert format_error_details(error) == expected
+    assert error.format_details() == expected
+
+
+def test_discord_network_error_format_details_shows_reason() -> None:
+    error = DiscordNetworkError(
+        method="POST",
+        path="/api/v10/channels/2000/messages",
+        reason="TimeoutError: timed out",
+    )
+
+    assert error.format_details() == "no response: TimeoutError: timed out"
 
 
 def test_get_current_user_builds_request(fake_urlopen: FakeUrlopen) -> None:

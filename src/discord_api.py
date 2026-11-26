@@ -221,6 +221,19 @@ class DiscordApiError(Exception):
         self.message = message
         self.body = body
 
+    def format_details(self) -> str:
+        """Return the status and Discord's error details on one line.
+
+        e.g. "403 Forbidden / Discord code 50007: Cannot send messages to this user"
+        """
+        status_line = f"{self.status} {self.reason}".rstrip()
+        if self.discord_code is not None:
+            code = f"Discord code {self.discord_code}"
+        else:
+            code = "no Discord code"
+        message_part = f": {self.message}" if self.message is not None else ""
+        return f"{status_line} / {code}{message_part}"
+
 
 class DiscordNetworkError(Exception):
     """A request to the Discord API got no response.
@@ -234,19 +247,12 @@ class DiscordNetworkError(Exception):
         super().__init__(summary)
         self.reason = reason
 
+    def format_details(self) -> str:
+        """Return what went wrong on one line,
 
-def format_error_details(error: DiscordApiError) -> str:
-    """Return the status and Discord's error details on one line.
-
-    e.g. "403 Forbidden / Discord code 50007: Cannot send messages to this user"
-    """
-    status_line = f"{error.status} {error.reason}".rstrip()
-    if error.discord_code is not None:
-        code = f"Discord code {error.discord_code}"
-    else:
-        code = "no Discord code"
-    message_part = f": {error.message}" if error.message is not None else ""
-    return f"{status_line} / {code}{message_part}"
+        e.g. "no response: TimeoutError: timed out".
+        """
+        return f"no response: {self.reason}"
 
 
 def _send(request: Request) -> bytes:

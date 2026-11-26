@@ -56,6 +56,60 @@ def _format_vote_log_prefix(vote_message_id: MessageId, vote_label: str) -> str:
     return f"Vote {vote_message_id} ({vote_label}):"
 
 
+def _format_vote_label(vote_message: Message) -> str:
+    thread = vote_message.get("thread")
+    thread_name = thread["name"] if thread is not None else "no thread"
+    return thread_name.removesuffix(COMMENT_THREAD_NAME_SUFFIX).rstrip()
+
+
+def _fetch_latest_vote(
+    token: str, channel_id: ChannelId
+) -> tuple[Message, PollResponse] | None:
+    """Fetch the newest vote in the channel, or log a warning and return None."""
+    channel_messages = get_channel_messages(token, channel_id)
+    bot_id = get_current_user(token)["id"]
+    vote_message = find_latest_vote_message(channel_messages, bot_id)
+
+    if vote_message is None:
+        logger.warning("No vote message found in channel %s", channel_id)
+        return None
+
+    if "poll" not in vote_message:
+        log_prefix = _format_vote_log_prefix(
+            vote_message["id"], _format_vote_label(vote_message)
+        )
+        logger.warning("%s the message has no poll", log_prefix)
+        return None
+    return vote_message, vote_message["poll"]
+
+
+def _fetch_voter_ids(
+    token: str, channel_id: ChannelId, vote_message_id: MessageId, poll: PollResponse
+) -> set[UserId]:
+    poll_answer_ids = [answer["answer_id"] for answer in poll["answers"]]
+    voters_per_answer = [
+        get_answer_voters(token, channel_id, vote_message_id, poll_answer_id)
+        for poll_answer_id in poll_answer_ids
+    ]
+    return collect_voter_ids(voters_per_answer)
+
+
+def _send_dm(token: str, recipient_id: UserId, body: MessageCreateRequest) -> None:
+    dm_channel = create_dm_channel(token, recipient_id)
+    post_message(token, dm_channel["id"], body)
+
+
+def _choose_report_url(
+    guild_id: GuildId, channel_id: ChannelId, vote_message: Message, log_prefix: str
+) -> str:
+    if "thread" in vote_message:
+        return format_thread_url(
+            guild_id, get_thread_id_started_from(vote_message["id"])
+        )
+    logger.warning("%s linking to the vote message instead of the thread", log_prefix)
+    return format_message_url(guild_id, channel_id, vote_message["id"])
+
+
 def start_vote(token: str, channel_id: ChannelId, today: date) -> None:
     """Post this week's vote and start its comment thread.
 
@@ -93,60 +147,6 @@ def start_vote(token: str, channel_id: ChannelId, today: date) -> None:
             COMMENT_THREAD_AUTO_ARCHIVE_MINUTES,
         )
         logger.info("%s started thread '%s'", log_prefix, thread_name)
-
-
-def _fetch_latest_vote(
-    token: str, channel_id: ChannelId
-) -> tuple[Message, PollResponse] | None:
-    """Fetch the newest vote in the channel, or log a warning and return None."""
-    channel_messages = get_channel_messages(token, channel_id)
-    bot_id = get_current_user(token)["id"]
-    vote_message = find_latest_vote_message(channel_messages, bot_id)
-
-    if vote_message is None:
-        logger.warning("No vote message found in channel %s", channel_id)
-        return None
-
-    if "poll" not in vote_message:
-        log_prefix = _format_vote_log_prefix(
-            vote_message["id"], _format_vote_label(vote_message)
-        )
-        logger.warning("%s the message has no poll", log_prefix)
-        return None
-    return vote_message, vote_message["poll"]
-
-
-def _fetch_voter_ids(
-    token: str, channel_id: ChannelId, vote_message_id: MessageId, poll: PollResponse
-) -> set[UserId]:
-    poll_answer_ids = [answer["answer_id"] for answer in poll["answers"]]
-    voters_per_answer = [
-        get_answer_voters(token, channel_id, vote_message_id, poll_answer_id)
-        for poll_answer_id in poll_answer_ids
-    ]
-    return collect_voter_ids(voters_per_answer)
-
-
-def _format_vote_label(vote_message: Message) -> str:
-    thread = vote_message.get("thread")
-    thread_name = thread["name"] if thread is not None else "no thread"
-    return thread_name.removesuffix(COMMENT_THREAD_NAME_SUFFIX).rstrip()
-
-
-def _send_dm(token: str, recipient_id: UserId, body: MessageCreateRequest) -> None:
-    dm_channel = create_dm_channel(token, recipient_id)
-    post_message(token, dm_channel["id"], body)
-
-
-def _choose_report_url(
-    guild_id: GuildId, channel_id: ChannelId, vote_message: Message, log_prefix: str
-) -> str:
-    if "thread" in vote_message:
-        return format_thread_url(
-            guild_id, get_thread_id_started_from(vote_message["id"])
-        )
-    logger.warning("%s linking to the vote message instead of the thread", log_prefix)
-    return format_message_url(guild_id, channel_id, vote_message["id"])
 
 
 def report_if_all_voted(

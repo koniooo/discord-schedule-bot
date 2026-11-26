@@ -17,23 +17,24 @@ from discord_api import (
 )
 from vote import (
     VOTE_ANNOUNCEMENT_TEXT,
+    VoteSummary,
     build_all_voted_report_message,
     build_deadline_report_message,
     build_dm_reminder_message,
     build_poll_answers,
     build_vote_channel_reminder_message,
     build_vote_message,
-    collect_human_non_voters,
     collect_voter_ids,
     find_latest_vote_message,
     format_comment_thread_name,
     format_message_url,
     format_thread_url,
     get_display_name,
-    get_poll_expires_at,
     has_own_reaction,
     is_human,
     is_vote_for,
+    parse_poll_expiry,
+    summarize_vote,
 )
 
 BOT_ID = UserId("4000")
@@ -185,8 +186,9 @@ def test_collect_voter_ids_returns_ids_of_all_voters(
 
 
 @pytest.mark.parametrize(
-    ("members", "voter_ids", "expected"),
+    ("guild_members", "voter_ids", "expected"),
     [
+        # The bot is neither counted nor listed as a non-voter.
         pytest.param(
             [
                 {"user": {"id": "4000", "bot": True}},
@@ -195,10 +197,13 @@ def test_collect_voter_ids_returns_ids_of_all_voters(
                 {"user": {"id": "4003"}},
             ],
             {"4002"},
-            [
-                {"user": {"id": "4001"}},
-                {"user": {"id": "4003"}},
-            ],
+            VoteSummary(
+                human_member_count=3,
+                human_non_voters=[
+                    {"user": {"id": UserId("4001")}},
+                    {"user": {"id": UserId("4003")}},
+                ],
+            ),
             id="ignores_bot",
         ),
         pytest.param(
@@ -206,11 +211,26 @@ def test_collect_voter_ids_returns_ids_of_all_voters(
                 {"user": {"id": "4000", "bot": True}},
                 {"user": {"id": "4001"}},
                 {"user": {"id": "4002"}},
-                {"user": {"id": "4003"}},
             ],
-            {"4001", "4002", "4003"},
-            [],
+            {"4001", "4002"},
+            VoteSummary(human_member_count=2, human_non_voters=[]),
             id="every_member_voted",
+        ),
+        pytest.param(
+            [
+                {"user": {"id": "4000", "bot": True}},
+                {"user": {"id": "4001"}},
+                {"user": {"id": "4002"}},
+            ],
+            set[UserId](),
+            VoteSummary(
+                human_member_count=2,
+                human_non_voters=[
+                    {"user": {"id": UserId("4001")}},
+                    {"user": {"id": UserId("4002")}},
+                ],
+            ),
+            id="no_member_voted",
         ),
         pytest.param(
             [
@@ -220,18 +240,21 @@ def test_collect_voter_ids_returns_ids_of_all_voters(
                 {"user": {"id": "4002"}},
             ],
             {"4002"},
-            [
-                {"user": {"id": "4003"}},
-                {"user": {"id": "4001"}},
-            ],
+            VoteSummary(
+                human_member_count=3,
+                human_non_voters=[
+                    {"user": {"id": UserId("4003")}},
+                    {"user": {"id": UserId("4001")}},
+                ],
+            ),
             id="keeps_member_order",
         ),
     ],
 )
-def test_collect_human_non_voters_excludes_bots_and_voters(
-    members: list[GuildMember], voter_ids: set[UserId], expected: list[GuildMember]
+def test_summarize_vote_counts_humans_and_lists_human_non_voters(
+    guild_members: list[GuildMember], voter_ids: set[UserId], expected: VoteSummary
 ) -> None:
-    assert collect_human_non_voters(members, voter_ids) == expected
+    assert summarize_vote(guild_members, voter_ids) == expected
 
 
 @pytest.mark.parametrize(
@@ -289,17 +312,17 @@ def test_build_all_voted_report_message_shows_count_link_and_jst_deadline() -> N
     }
 
 
-def test_get_poll_expires_at_returns_expiry_as_aware_datetime() -> None:
+def test_parse_poll_expiry_returns_expiry_as_aware_datetime() -> None:
     poll = PollResponse(answers=[], expiry="2026-11-24T03:00:00.123000+00:00")
-    assert get_poll_expires_at(poll) == datetime(
+    assert parse_poll_expiry(poll) == datetime(
         2026, 11, 24, 3, 0, 0, 123000, tzinfo=UTC
     )
 
 
-def test_get_poll_expires_at_raises_when_poll_has_no_expiry() -> None:
+def test_parse_poll_expiry_raises_when_poll_has_no_expiry() -> None:
     poll = PollResponse(answers=[], expiry=None)
     with pytest.raises(ValueError, match="expiry"):
-        get_poll_expires_at(poll)
+        parse_poll_expiry(poll)
 
 
 @pytest.mark.parametrize(
@@ -395,7 +418,7 @@ def test_get_display_name_prefers_nick_then_global_name_then_username(
 
 
 @pytest.mark.parametrize(
-    ("human_non_voter_ids", "expected"),
+    ("human_non_voters", "expected"),
     [
         pytest.param(
             [],
@@ -407,25 +430,30 @@ def test_get_display_name_prefers_nick_then_global_name_then_username(
             id="everyone_voted",
         ),
         pytest.param(
-            [UserId("4000"), UserId("4002"), UserId("4005")],
+            [
+                {"nick": "Alice", "user": {"id": "4001", "username": "alice"}},
+                {"user": {"id": "4002"}},
+                {"user": {"id": "4005"}},
+            ],
             {
+                # Mentions only, even when a member has a nick.
                 "content": "投票が締め切られたクポ～\n"
                 "5/8人が投票したクポ。\n"
                 "https://discord.com/channels/1000/2000\n"
                 "\n"
                 "以下のメンバーが未投票だったクポ。\n"
-                "<@4000> <@4002> <@4005>"
+                "<@4001> <@4002> <@4005>"
             },
             id="some_members_did_not_vote",
         ),
     ],
 )
 def test_build_deadline_report_message_shows_count_link_and_non_voters(
-    human_non_voter_ids: list[UserId], expected: MessageCreateRequest
+    human_non_voters: list[GuildMember], expected: MessageCreateRequest
 ) -> None:
     assert (
         build_deadline_report_message(
-            8, human_non_voter_ids, "https://discord.com/channels/1000/2000"
+            8, human_non_voters, "https://discord.com/channels/1000/2000"
         )
         == expected
     )

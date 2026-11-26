@@ -36,17 +36,16 @@ from vote import (
     build_dm_reminder_message,
     build_vote_channel_reminder_message,
     build_vote_message,
-    collect_human_non_voters,
     collect_voter_ids,
     find_latest_vote_message,
     format_comment_thread_name,
     format_message_url,
     format_thread_url,
     get_display_name,
-    get_poll_expires_at,
     has_own_reaction,
-    is_human,
     is_vote_for,
+    parse_poll_expiry,
+    summarize_vote,
 )
 
 logger = logging.getLogger(__name__)
@@ -170,7 +169,7 @@ def report_if_all_voted(
         vote_message_id, _format_vote_label(vote_message)
     )
 
-    poll_expires_at = get_poll_expires_at(poll)
+    poll_expires_at = parse_poll_expiry(poll)
     if now >= poll_expires_at:
         logger.debug("%s the poll has already closed", log_prefix)
         return
@@ -181,11 +180,7 @@ def report_if_all_voted(
     voter_ids = _fetch_voter_ids(token, channel_id, vote_message_id, poll)
     guild_members = list_guild_members(token, guild_id)
 
-    human_non_voters = collect_human_non_voters(guild_members, voter_ids)
-    human_members = [
-        guild_member for guild_member in guild_members if is_human(guild_member)
-    ]
-    human_member_count = len(human_members)
+    human_member_count, human_non_voters = summarize_vote(guild_members, voter_ids)
     voted_count = human_member_count - len(human_non_voters)
 
     logger.info(
@@ -229,7 +224,7 @@ def send_reminders(
     log_prefix = _format_vote_log_prefix(
         vote_message_id, _format_vote_label(vote_message)
     )
-    poll_expires_at = get_poll_expires_at(poll)
+    poll_expires_at = parse_poll_expiry(poll)
     if now >= poll_expires_at:
         logger.warning("%s the poll has already closed; no reminders sent", log_prefix)
         return
@@ -237,7 +232,7 @@ def send_reminders(
     voter_ids = _fetch_voter_ids(token, channel_id, vote_message_id, poll)
     guild_members = list_guild_members(token, guild_id)
 
-    human_non_voters = collect_human_non_voters(guild_members, voter_ids)
+    human_non_voters = summarize_vote(guild_members, voter_ids).human_non_voters
     if not human_non_voters:
         logger.info("%s everyone has voted; no reminders needed", log_prefix)
         return
@@ -316,7 +311,7 @@ def close_vote(
     log_prefix = _format_vote_log_prefix(
         vote_message_id, _format_vote_label(vote_message)
     )
-    poll_expires_at = get_poll_expires_at(poll)
+    poll_expires_at = parse_poll_expiry(poll)
     if now < poll_expires_at:
         logger.warning(
             "%s the poll hasn't closed yet (closes at %s)", log_prefix, poll_expires_at
@@ -332,16 +327,10 @@ def close_vote(
     else:
         voter_ids = _fetch_voter_ids(token, channel_id, vote_message_id, poll)
         guild_members = list_guild_members(token, guild_id)
-        human_members = [
-            guild_member for guild_member in guild_members if is_human(guild_member)
-        ]
-        human_non_voters = collect_human_non_voters(guild_members, voter_ids)
-        human_non_voter_ids = [
-            human_non_voter["user"]["id"] for human_non_voter in human_non_voters
-        ]
+        human_member_count, human_non_voters = summarize_vote(guild_members, voter_ids)
         url = _choose_report_url(guild_id, channel_id, vote_message, log_prefix)
         deadline_report_message = build_deadline_report_message(
-            len(human_members), human_non_voter_ids, url
+            human_member_count, human_non_voters, url
         )
 
         _send_dm(token, master_user_id, deadline_report_message)

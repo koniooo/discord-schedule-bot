@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from datetime import date, datetime, timedelta
+from typing import NamedTuple
 
 from discord_api import (
     AutoArchiveDuration,
@@ -32,6 +33,11 @@ COMMENT_THREAD_AUTO_ARCHIVE_MINUTES: AutoArchiveDuration = 60 * 24 * 7
 
 ALL_VOTED_REPORTED_EMOJI = "✅"
 DEADLINE_REPORTED_EMOJI = "🏁"
+
+
+class VoteSummary(NamedTuple):
+    human_member_count: int
+    human_non_voters: list[GuildMember]
 
 
 def build_poll_answers(candidate_days: list[date]) -> list[PollAnswer]:
@@ -81,19 +87,21 @@ def is_human(guild_member: GuildMember) -> bool:
     return not guild_member["user"].get("bot", False)
 
 
-def collect_human_non_voters(
+def summarize_vote(
     guild_members: list[GuildMember], voter_ids: set[UserId]
-) -> list[GuildMember]:
-    """Return the human members who have not voted, in member order."""
-
-    def is_human_non_voter(guild_member: GuildMember) -> bool:
-        return is_human(guild_member) and guild_member["user"]["id"] not in voter_ids
-
-    return [
-        guild_member
-        for guild_member in guild_members
-        if is_human_non_voter(guild_member)
+) -> VoteSummary:
+    """Count the human members and list those who haven't voted, in member order."""
+    human_members = [
+        guild_member for guild_member in guild_members if is_human(guild_member)
     ]
+    human_non_voters = [
+        human_member
+        for human_member in human_members
+        if human_member["user"]["id"] not in voter_ids
+    ]
+    return VoteSummary(
+        human_member_count=len(human_members), human_non_voters=human_non_voters
+    )
 
 
 def has_own_reaction(message: Message, emoji: str) -> bool:
@@ -105,7 +113,7 @@ def has_own_reaction(message: Message, emoji: str) -> bool:
     )
 
 
-def get_poll_expires_at(poll: PollResponse) -> datetime:
+def parse_poll_expiry(poll: PollResponse) -> datetime:
     expiry = poll["expiry"]
     if expiry is None:
         raise ValueError("Poll has no expiry")
@@ -182,16 +190,18 @@ def get_display_name(guild_member: GuildMember) -> str:
 
 
 def build_deadline_report_message(
-    human_member_count: int, human_non_voter_ids: list[UserId], url: str
+    human_member_count: int, human_non_voters: list[GuildMember], url: str
 ) -> MessageCreateRequest:
-    human_non_voter_count = len(human_non_voter_ids)
+    human_non_voter_count = len(human_non_voters)
     human_voter_count = human_member_count - human_non_voter_count
     summary = (
         f"{human_member_count}人全員が投票したクポ。"
         if human_non_voter_count == 0
         else f"{human_voter_count}/{human_member_count}人が投票したクポ。"
     )
-    mentions = " ".join([f"<@{non_voter_id}>" for non_voter_id in human_non_voter_ids])
+    mentions = " ".join(
+        [f"<@{human_non_voter['user']['id']}>" for human_non_voter in human_non_voters]
+    )
     non_voter_ids_text = f"\n\n以下のメンバーが未投票だったクポ。\n{mentions}"
 
     content = (

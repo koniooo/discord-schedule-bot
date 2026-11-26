@@ -6,8 +6,9 @@ from schedule import (
     format_date_range,
     format_date_with_weekday,
     get_monday_of_week,
-    get_monday_to_sunday_after_next,
+    get_nearest_monday,
     get_seven_days_from,
+    get_week_after_nearest_monday,
 )
 
 
@@ -38,23 +39,43 @@ def test_get_seven_days_from_returns_consecutive_days_including_start() -> None:
 
 
 @pytest.mark.parametrize(
-    "day",
+    ("day", "expected_monday"),
     [
-        pytest.param(date(2026, 10, 26), id="monday"),
-        pytest.param(date(2026, 11, 1), id="sunday"),
+        pytest.param(date(2026, 11, 23), date(2026, 11, 23), id="monday_itself"),
+        # Thursday is 3 days after Monday and 4 days before the next one.
+        pytest.param(date(2026, 11, 26), date(2026, 11, 23), id="thursday"),
+        pytest.param(date(2026, 11, 27), date(2026, 11, 30), id="friday"),
+        pytest.param(date(2026, 11, 29), date(2026, 11, 30), id="sunday_next_monday"),
+        pytest.param(date(2026, 12, 31), date(2026, 12, 28), id="thursday_across_year"),
     ],
 )
-def test_get_monday_to_sunday_after_next_returns_same_result_for_any_day_in_week(
+def test_get_nearest_monday_picks_this_weeks_monday_until_thursday(
+    day: date, expected_monday: date
+) -> None:
+    assert get_nearest_monday(day) == expected_monday
+
+
+# The vote may be posted on Sunday, Monday or Tuesday; each gives the week
+# that starts on the coming Monday 11/30.
+@pytest.mark.parametrize(
+    "day",
+    [
+        pytest.param(date(2026, 11, 22), id="sunday"),
+        pytest.param(date(2026, 11, 23), id="monday"),
+        pytest.param(date(2026, 11, 24), id="tuesday"),
+    ],
+)
+def test_get_week_after_nearest_monday_starts_on_coming_monday_from_sunday_to_tuesday(
     day: date,
 ) -> None:
-    assert get_monday_to_sunday_after_next(day) == [
-        date(2026, 11, 9),
-        date(2026, 11, 10),
-        date(2026, 11, 11),
-        date(2026, 11, 12),
-        date(2026, 11, 13),
-        date(2026, 11, 14),
-        date(2026, 11, 15),
+    assert get_week_after_nearest_monday(day) == [
+        date(2026, 11, 30),
+        date(2026, 12, 1),
+        date(2026, 12, 2),
+        date(2026, 12, 3),
+        date(2026, 12, 4),
+        date(2026, 12, 5),
+        date(2026, 12, 6),
     ]
 
 

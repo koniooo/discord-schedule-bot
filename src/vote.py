@@ -21,7 +21,7 @@ from vote_timing import VOTE_DURATION
 NO_AVAILABLE_DAY_TEXT = "どの日も難しい"
 
 VOTE_ANNOUNCEMENT_TEXT = (
-    "再来週のスケジュールを決めるクポ～。ご投票お願いしますクポ。\n\n"
+    "次回のスケジュールを決めるクポ～。ご投票お願いしますクポ。\n\n"
     "「この日は遅れるかも・まだわからない」といったコメントは、このメッセージにぶら下がってるスレッドへどうぞクポ。"
 )
 

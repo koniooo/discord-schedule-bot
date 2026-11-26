@@ -26,7 +26,7 @@ from discord_api import (
     post_message,
     start_thread_from_message,
 )
-from schedule import format_date_range, get_monday_to_sunday_after_next
+from schedule import format_date_range, get_week_after_nearest_monday
 from vote import (
     ALL_VOTED_REPORTED_EMOJI,
     COMMENT_THREAD_AUTO_ARCHIVE_MINUTES,
@@ -125,7 +125,7 @@ def start_vote(token: str, channel_id: ChannelId, today: date) -> None:
     If an earlier run already posted this week's vote, reuse it and only
     start the thread if it's missing, so a retried run never posts twice.
     """
-    candidate_days = get_monday_to_sunday_after_next(today)
+    candidate_days = get_week_after_nearest_monday(today)
     date_range = format_date_range(candidate_days[0], candidate_days[-1])
     channel_messages = get_channel_messages(token, channel_id)
     bot_id = get_current_user(token)["id"]

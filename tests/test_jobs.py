@@ -21,7 +21,7 @@ from discord_api import (
     UserId,
 )
 from jobs import close_vote, report_if_all_voted, send_reminders, start_vote
-from schedule import get_monday_to_sunday_after_next
+from schedule import get_week_after_nearest_monday
 from vote import build_poll_answers, build_vote_message
 
 type Call = tuple[object, ...]
@@ -193,7 +193,7 @@ START_VOTE_TODAY = date(2026, 11, 22)
 
 
 def answer_texts_for(today: date) -> list[str]:
-    candidate_days = get_monday_to_sunday_after_next(today)
+    candidate_days = get_week_after_nearest_monday(today)
     return [
         answer["poll_media"]["text"] for answer in build_poll_answers(candidate_days)
     ]
@@ -211,7 +211,7 @@ def test_start_vote_posts_vote_message_and_starts_comment_thread(
 
     run_start_vote()
 
-    candidate_days = get_monday_to_sunday_after_next(START_VOTE_TODAY)
+    candidate_days = get_week_after_nearest_monday(START_VOTE_TODAY)
     assert fake_discord.calls == [
         ("get_channel_messages", "2000"),
         ("get_current_user",),

@@ -1,5 +1,6 @@
 import logging
 from datetime import date, datetime
+from typing import NamedTuple
 
 from discord_api import (
     CANNOT_SEND_MESSAGES_TO_USER,
@@ -51,6 +52,13 @@ from vote import (
 logger = logging.getLogger(__name__)
 
 
+class _Vote(NamedTuple):
+    message: Message
+    poll: PollResponse
+    log_prefix: str
+    expires_at: datetime
+
+
 def _format_vote_log_prefix(vote_message_id: MessageId, vote_label: str) -> str:
     return f"Vote {vote_message_id} ({vote_label}):"
 
@@ -61,25 +69,27 @@ def _format_vote_label(vote_message: Message) -> str:
     return thread_name.removesuffix(COMMENT_THREAD_NAME_SUFFIX).rstrip()
 
 
-def _fetch_latest_vote(
-    token: str, channel_id: ChannelId
-) -> tuple[Message, PollResponse] | None:
+def _fetch_latest_vote(token: str, channel_id: ChannelId) -> _Vote | None:
     """Fetch the newest vote in the channel, or log a warning and return None."""
     channel_messages = get_channel_messages(token, channel_id)
     bot_id = get_current_user(token)["id"]
     vote_message = find_latest_vote_message(channel_messages, bot_id)
-
     if vote_message is None:
         logger.warning("No vote message found in channel %s", channel_id)
         return None
-
+    log_prefix = _format_vote_log_prefix(
+        vote_message["id"], _format_vote_label(vote_message)
+    )
     if "poll" not in vote_message:
-        log_prefix = _format_vote_log_prefix(
-            vote_message["id"], _format_vote_label(vote_message)
-        )
         logger.warning("%s the message has no poll", log_prefix)
         return None
-    return vote_message, vote_message["poll"]
+    poll = vote_message["poll"]
+    return _Vote(
+        message=vote_message,
+        poll=poll,
+        log_prefix=log_prefix,
+        expires_at=parse_poll_expiry(poll),
+    )
 
 
 def _fetch_voter_ids(
@@ -160,16 +170,11 @@ def report_if_all_voted(
     Marks the vote message with ALL_VOTED_REPORTED_EMOJI after the DM is sent.
     `now` must be timezone-aware.
     """
-    found = _fetch_latest_vote(token, channel_id)
-    if found is None:
+    vote = _fetch_latest_vote(token, channel_id)
+    if vote is None:
         return
-    vote_message, poll = found
+    vote_message, poll, log_prefix, poll_expires_at = vote
     vote_message_id = vote_message["id"]
-    log_prefix = _format_vote_log_prefix(
-        vote_message_id, _format_vote_label(vote_message)
-    )
-
-    poll_expires_at = parse_poll_expiry(poll)
     if now >= poll_expires_at:
         logger.debug("%s the poll has already closed", log_prefix)
         return
@@ -216,15 +221,11 @@ def send_reminders(
     post one reminder in the vote channel as well.
     `now` must be timezone-aware.
     """
-    found = _fetch_latest_vote(token, channel_id)
-    if found is None:
+    vote = _fetch_latest_vote(token, channel_id)
+    if vote is None:
         return
-    vote_message, poll = found
+    vote_message, poll, log_prefix, poll_expires_at = vote
     vote_message_id = vote_message["id"]
-    log_prefix = _format_vote_log_prefix(
-        vote_message_id, _format_vote_label(vote_message)
-    )
-    poll_expires_at = parse_poll_expiry(poll)
     if now >= poll_expires_at:
         logger.warning("%s the poll has already closed; no reminders sent", log_prefix)
         return
@@ -307,7 +308,8 @@ def _send_deadline_report(
             log_prefix,
         )
     else:
-        voter_ids = _fetch_voter_ids(token, channel_id, vote_message["id"], poll)
+        vote_message_id = vote_message["id"]
+        voter_ids = _fetch_voter_ids(token, channel_id, vote_message_id, poll)
         guild_members = list_guild_members(token, guild_id)
         human_member_count, human_non_voters = summarize_vote(guild_members, voter_ids)
         url = _choose_report_url(guild_id, channel_id, vote_message, log_prefix)
@@ -317,7 +319,7 @@ def _send_deadline_report(
 
         _send_dm(token, master_user_id, deadline_report_message)
         logger.info("%s sent the deadline report to the master", log_prefix)
-        add_reaction(token, channel_id, vote_message["id"], DEADLINE_REPORTED_EMOJI)
+        add_reaction(token, channel_id, vote_message_id, DEADLINE_REPORTED_EMOJI)
 
 
 def _lock_and_archive_thread(
@@ -352,14 +354,10 @@ def close_vote(
     retried run doesn't repeat finished steps.
     `now` must be timezone-aware.
     """
-    found = _fetch_latest_vote(token, channel_id)
-    if found is None:
+    vote = _fetch_latest_vote(token, channel_id)
+    if vote is None:
         return
-    vote_message, poll = found
-    log_prefix = _format_vote_log_prefix(
-        vote_message["id"], _format_vote_label(vote_message)
-    )
-    poll_expires_at = parse_poll_expiry(poll)
+    vote_message, poll, log_prefix, poll_expires_at = vote
     if now < poll_expires_at:
         logger.warning(
             "%s the poll hasn't closed yet (closes at %s)", log_prefix, poll_expires_at

@@ -5,8 +5,8 @@ from discord_api import UserId
 
 type EnvVarName = Literal[
     "DISCORD_BOT_TOKEN",
-    "DISCORD_CHANNEL_ID",
     "DISCORD_GUILD_ID",
+    "DISCORD_CHANNEL_ID",
     "DISCORD_MASTER_USER_ID",
     "DISCORD_DEEP_DUNGEON_MEMBER_IDS",
 ]

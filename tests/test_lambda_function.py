@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from datetime import UTC, date, datetime
 from typing import cast
 
@@ -24,6 +24,15 @@ class FakeJobs:
         return fake_job
 
 
+@pytest.fixture(autouse=True)
+def restore_root_log_level() -> Iterator[None]:
+    """Undo the root logger level that lambda_handler sets on every call."""
+    root_logger = logging.getLogger()
+    original_level = root_logger.level
+    yield
+    root_logger.setLevel(original_level)
+
+
 @pytest.fixture
 def fake_jobs(monkeypatch: pytest.MonkeyPatch) -> FakeJobs:
     fake = FakeJobs()
@@ -33,6 +42,7 @@ def fake_jobs(monkeypatch: pytest.MonkeyPatch) -> FakeJobs:
     monkeypatch.setenv("DISCORD_GUILD_ID", "1001")
     monkeypatch.setenv("DISCORD_CHANNEL_ID", "2000")
     monkeypatch.setenv("DISCORD_MASTER_USER_ID", "4003")
+    monkeypatch.setenv("LOG_LEVEL", "INFO")
     return fake
 
 
@@ -126,4 +136,19 @@ def test_lambda_handler_logs_job_and_scheduled_time_first(
     )
 
     assert caplog.messages[0] == "job: start_vote (scheduled at 2026-11-29T03:00:00Z)"
+    assert [job for job, _ in fake_jobs.calls] == ["start_vote"]
+
+
+def test_lambda_handler_sets_root_log_level_from_log_level_env_var(
+    fake_jobs: FakeJobs, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Lambda starts the root logger at WARNING.
+    logging.getLogger().setLevel(logging.WARNING)
+    monkeypatch.setenv("LOG_LEVEL", "DEBUG")
+
+    lambda_handler(
+        {"job": "start_vote", "scheduled_time": "2026-11-29T03:00:00Z"}, None
+    )
+
+    assert logging.getLogger().level == logging.DEBUG
     assert [job for job, _ in fake_jobs.calls] == ["start_vote"]

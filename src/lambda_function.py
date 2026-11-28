@@ -2,14 +2,12 @@ import logging
 from datetime import UTC, datetime
 from typing import TypedDict
 
-from config import get_required_env
+from config import get_log_level, get_required_env
 from discord_api import ChannelId, GuildId, UserId
 from jobs import close_vote, report_if_all_voted, send_reminders, start_vote
 from schedule import JST
 
 logger = logging.getLogger(__name__)
-# Lambda's root logger stays at WARNING, which would hide the jobs' INFO logs.
-logging.getLogger().setLevel(logging.INFO)
 
 
 class ScheduledJobEvent(TypedDict):
@@ -26,6 +24,10 @@ def lambda_handler(event: ScheduledJobEvent, _context: object) -> None:
     still picks the same candidate week. The other jobs check the poll's
     current state, so they get the real current time.
     """
+
+    # Lambda already gives the root logger a handler, so basicConfig would do nothing;
+    # set the level directly.
+    logging.getLogger().setLevel(get_log_level())
     job = event["job"]
     scheduled_time = event["scheduled_time"]
     logger.info("job: %s (scheduled at %s)", job, scheduled_time)

@@ -3,14 +3,14 @@ from datetime import UTC, datetime
 
 from dotenv import load_dotenv
 
-from config import get_required_env
+from config import get_log_level, get_required_env
 from discord_api import ChannelId, GuildId, UserId
 from jobs import close_vote
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO)
     load_dotenv()
+    logging.basicConfig(level=get_log_level())
     token = get_required_env("DISCORD_BOT_TOKEN")
     channel_id = ChannelId(get_required_env("DISCORD_CHANNEL_ID"))
     guild_id = GuildId(get_required_env("DISCORD_GUILD_ID"))

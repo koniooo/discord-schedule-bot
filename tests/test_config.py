@@ -1,6 +1,8 @@
+import logging
+
 import pytest
 
-from config import get_deep_dungeon_member_ids, get_required_env
+from config import get_deep_dungeon_member_ids, get_log_level, get_required_env
 from discord_api import UserId
 
 
@@ -75,3 +77,59 @@ def test_get_deep_dungeon_member_ids_raises_when_unset(
     monkeypatch.delenv("DISCORD_DEEP_DUNGEON_MEMBER_IDS", raising=False)
     with pytest.raises(RuntimeError, match="DISCORD_DEEP_DUNGEON_MEMBER_IDS"):
         get_deep_dungeon_member_ids()
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        pytest.param("WARNING", "WARNING", id="upper_case"),
+        pytest.param("debug", "DEBUG", id="lower_case"),
+    ],
+)
+def test_get_log_level_returns_value_in_upper_case(
+    value: str,
+    expected: str,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setenv("LOG_LEVEL", value)
+    caplog.set_level(logging.DEBUG, logger="config")
+
+    assert get_log_level() == expected
+    assert caplog.record_tuples == []
+
+
+@pytest.mark.parametrize(
+    ("value", "log_text"),
+    [
+        pytest.param(
+            "INVALID",
+            "LOG_LEVEL 'INVALID' is not a valid level; using INFO",
+            id="invalid",
+        ),
+        pytest.param("", "LOG_LEVEL is not set; using INFO", id="empty"),
+    ],
+)
+def test_get_log_level_returns_info_and_warns_when_empty_or_invalid(
+    value: str,
+    log_text: str,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setenv("LOG_LEVEL", value)
+    caplog.set_level(logging.WARNING, logger="config")
+
+    assert get_log_level() == "INFO"
+    assert caplog.record_tuples == [("config", logging.WARNING, log_text)]
+
+
+def test_get_log_level_returns_info_and_warns_when_unset(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.delenv("LOG_LEVEL", raising=False)
+    caplog.set_level(logging.WARNING, logger="config")
+
+    assert get_log_level() == "INFO"
+    assert caplog.record_tuples == [
+        ("config", logging.WARNING, "LOG_LEVEL is not set; using INFO")
+    ]

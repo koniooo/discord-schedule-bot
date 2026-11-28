@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Literal
 
@@ -9,7 +10,10 @@ type EnvVarName = Literal[
     "DISCORD_CHANNEL_ID",
     "DISCORD_MASTER_USER_ID",
     "DISCORD_DEEP_DUNGEON_MEMBER_IDS",
+    "LOG_LEVEL",
 ]
+
+logger = logging.getLogger(__name__)
 
 
 def get_required_env(name: EnvVarName) -> str:
@@ -38,3 +42,17 @@ def get_deep_dungeon_member_ids() -> list[UserId]:
             raise RuntimeError(f"{name} has a duplicate id: {member_id!r}")
         seen.add(member_id)
     return [UserId(member_id) for member_id in member_ids]
+
+
+def get_log_level() -> str:
+    """Return LOG_LEVEL upper-cased; warn and return "INFO" if missing or invalid."""
+    name: EnvVarName = "LOG_LEVEL"
+    value = os.environ.get(name)
+    if not value:
+        logger.warning("%s is not set; using INFO", name)
+        return "INFO"
+    level = value.upper()
+    if level not in logging.getLevelNamesMapping():
+        logger.warning("%s %r is not a valid level; using INFO", name, value)
+        return "INFO"
+    return level

@@ -208,6 +208,23 @@ def test_collect_voter_ids_returns_ids_of_all_voters(
         ),
         pytest.param(
             [
+                {"user": {"id": "4003"}},
+                {"user": {"id": "4000", "bot": True}},
+                {"user": {"id": "4001"}},
+                {"user": {"id": "4002"}},
+            ],
+            {"4002"},
+            VoteSummary(
+                human_member_count=3,
+                human_non_voters=[
+                    {"user": {"id": UserId("4003")}},
+                    {"user": {"id": UserId("4001")}},
+                ],
+            ),
+            id="keeps_member_order",
+        ),
+        pytest.param(
+            [
                 {"user": {"id": "4000", "bot": True}},
                 {"user": {"id": "4001"}},
                 {"user": {"id": "4002"}},
@@ -231,23 +248,6 @@ def test_collect_voter_ids_returns_ids_of_all_voters(
                 ],
             ),
             id="no_member_voted",
-        ),
-        pytest.param(
-            [
-                {"user": {"id": "4003"}},
-                {"user": {"id": "4000", "bot": True}},
-                {"user": {"id": "4001"}},
-                {"user": {"id": "4002"}},
-            ],
-            {"4002"},
-            VoteSummary(
-                human_member_count=3,
-                human_non_voters=[
-                    {"user": {"id": UserId("4003")}},
-                    {"user": {"id": UserId("4001")}},
-                ],
-            ),
-            id="keeps_member_order",
         ),
     ],
 )
@@ -421,15 +421,6 @@ def test_get_display_name_prefers_nick_then_global_name_then_username(
     ("human_non_voters", "expected"),
     [
         pytest.param(
-            [],
-            {
-                "content": "投票が締め切られたクポ～\n"
-                "8人全員が投票したクポ。\n"
-                "https://discord.com/channels/1000/2000"
-            },
-            id="everyone_voted",
-        ),
-        pytest.param(
             [
                 {"nick": "Alice", "user": {"id": "4001", "username": "alice"}},
                 {"user": {"id": "4002"}},
@@ -445,6 +436,15 @@ def test_get_display_name_prefers_nick_then_global_name_then_username(
                 "<@4001> <@4002> <@4005>"
             },
             id="some_members_did_not_vote",
+        ),
+        pytest.param(
+            [],
+            {
+                "content": "投票が締め切られたクポ～\n"
+                "8人全員が投票したクポ。\n"
+                "https://discord.com/channels/1000/2000"
+            },
+            id="everyone_voted",
         ),
     ],
 )

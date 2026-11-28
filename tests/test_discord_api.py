@@ -147,11 +147,6 @@ def test_build_request_rejects_post_without_body() -> None:
             id="discord_error",
         ),
         pytest.param(
-            b'{"message": "401: Unauthorized", "code": 0}',
-            DiscordErrorBody(discord_code=0, message="401: Unauthorized"),
-            id="general_error_code_zero",
-        ),
-        pytest.param(
             b'{"message": "You are being rate limited.", "retry_after": 1.5}',
             DiscordErrorBody(discord_code=None, message="You are being rate limited."),
             id="no_code",
@@ -160,6 +155,11 @@ def test_build_request_rejects_post_without_body() -> None:
             b'{"code": 50007}',
             DiscordErrorBody(discord_code=50007, message=None),
             id="no_message",
+        ),
+        pytest.param(
+            b'{"message": "401: Unauthorized", "code": 0}',
+            DiscordErrorBody(discord_code=0, message="401: Unauthorized"),
+            id="general_error_code_zero",
         ),
         pytest.param(
             b'{"message": "Cannot send messages to this user", "code": "50007"}',
@@ -205,18 +205,18 @@ def test_parse_error_body_returns_code_and_message(
             id="code_and_message",
         ),
         pytest.param(
-            429,
-            "Too Many Requests",
-            b'{"message": "You are being rate limited.", "retry_after": 1.5}',
-            "POST /api/v10/channels/2000/messages returned 429 Too Many Requests: You are being rate limited.",
-            id="message_only",
-        ),
-        pytest.param(
             400,
             "Bad Request",
             b'{"code": 50035}',
             'POST /api/v10/channels/2000/messages returned 400 Bad Request: {"code": 50035} (Discord code 50035)',
             id="code_only",
+        ),
+        pytest.param(
+            429,
+            "Too Many Requests",
+            b'{"message": "You are being rate limited.", "retry_after": 1.5}',
+            "POST /api/v10/channels/2000/messages returned 429 Too Many Requests: You are being rate limited.",
+            id="message_only",
         ),
         pytest.param(
             502,
